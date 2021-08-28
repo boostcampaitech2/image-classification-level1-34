@@ -33,7 +33,6 @@ class BaseModel(nn.Module):
         x = x.view(-1, 128)
         return self.fc(x)
 
-
 # Custom Model Template
 class MyModel(nn.Module):
     def __init__(self, num_classes):
@@ -52,3 +51,20 @@ class MyModel(nn.Module):
         """
         return x
 
+# ResMLP model
+from res_mlp_pytorch import ResMLP
+
+class myResMLP(nn.Module):
+    def __init__(self, num_classes):
+        super().__init__()
+        self.model = ResMLP(
+            image_size = (128, 96),
+            patch_size = 16,
+            dim = 512,
+            depth = 12,
+            num_classes = num_classes
+        )
+
+    def forward(self, x):
+        x = self.model(x)
+        return x
