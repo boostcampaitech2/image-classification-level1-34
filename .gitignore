@@ -10,3 +10,6 @@ __pycache__
 # ignore model saved file and output file
 /Base/model
 /Base/output
+
+# ignore download_link
+download_link.txt
