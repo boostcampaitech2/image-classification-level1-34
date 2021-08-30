@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "train.py", line 318, in <module>
+    train(data_dir, model_dir, args)
+  File "train.py", line 179, in train
+    wandb.wawtch(model)
+AttributeError: module 'wandb' has no attribute 'wawtch'

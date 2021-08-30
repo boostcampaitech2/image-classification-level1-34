@@ -1,0 +1,15 @@
+
+Epoch[0/1](20/236) || training loss 2.853 || training accuracy 12.97% || lr 0.001
+Epoch[0/1](40/236) || training loss 2.836 || training accuracy 18.98% || lr 0.001
+Epoch[0/1](60/236) || training loss 2.829 || training accuracy 20.47% || lr 0.001
+Epoch[0/1](80/236) || training loss 2.817 || training accuracy 19.38% || lr 0.001
+Epoch[0/1](100/236) || training loss 2.806 || training accuracy 19.14% || lr 0.001
+Epoch[0/1](120/236) || training loss 2.79 || training accuracy 19.69% || lr 0.001
+Epoch[0/1](140/236) || training loss 2.776 || training accuracy 18.20% || lr 0.001
+Epoch[0/1](160/236) || training loss 2.759 || training accuracy 20.39% || lr 0.001
+Epoch[0/1](180/236) || training loss 2.757 || training accuracy 17.66% || lr 0.001
+Epoch[0/1](200/236) || training loss 2.729 || training accuracy 17.97% || lr 0.001
+Epoch[0/1](220/236) || training loss 2.712 || training accuracy 20.62% || lr 0.001
+Calculating validation results...
+New best model for val accuracy : 15.26%! saving the best model..
+[Val] acc : 15.26%, loss:  2.7 || best acc : 15.26%, best loss:  2.7
