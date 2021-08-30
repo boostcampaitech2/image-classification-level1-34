@@ -11,7 +11,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -19,7 +19,7 @@ from dataset import MaskBaseDataset
 from loss import create_criterion
 
 import torch.optim as optim
-
+from tqdm import tqdm
 
 def seed_everything(seed):
     torch.manual_seed(seed)
@@ -83,6 +83,27 @@ def increment_path(path, exist_ok=False):
         i = [int(m.groups()[0]) for m in matches if m]
         n = max(i) + 1 if i else 2
         return f"{path}{n}"
+"""
+cut_mix function
+"""
+def rand_bbox(size, lam): # size : [Batch_size, Channel, Width, Height]
+    W = size[2] 
+    H = size[3] 
+    cut_rat = np.sqrt(1. - lam)  # 패치 크기 비율
+    cut_w = np.int(W * cut_rat)
+    cut_h = np.int(H * cut_rat)  
+
+   	# 패치의 중앙 좌표 값 cx, cy
+    cx = np.random.randint(W)
+    cy = np.random.randint(H)
+		
+    # 패치 모서리 좌표 값 
+    bbx1 = np.clip(cx - cut_w // 2, 0, W)
+    bby1 = np.clip(cy - cut_h // 2, 0, H)
+    bbx2 = np.clip(cx + cut_w // 2, 0, W)
+    bby2 = np.clip(cy + cut_h // 2, 0, H)
+   
+    return bbx1, bby1, bbx2, bby2
 
 
 def train(data_dir, model_dir, args):
@@ -166,17 +187,30 @@ def train(data_dir, model_dir, args):
         model.train()
         loss_value = 0
         matches = 0
-        for idx, train_batch in enumerate(train_loader):
+        for idx, train_batch in tqdm(enumerate(train_loader)):
             inputs, labels = train_batch
             inputs = inputs.to(device)
             labels = labels.to(device)
 
             optimizer.zero_grad()
-
-            outs = model(inputs)
+            
+            r = np.random.rand(1)
+            if args.beta > 0 and  r < args.cutmix_prob:     
+                lam = np.random.beta(args.beta, args.beta)
+                rand_index = torch.randperm(inputs.size()[0]).to(device)
+                target_a = labels 
+                target_b = labels[rand_index]        
+                bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam)
+                inputs[:, :, bbx1:bbx2, bby1:bby2] = inputs[rand_index, :, bbx1:bbx2, bby1:bby2]
+                lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
+                outs = model(inputs)
+                loss = criterion(outs, target_a) * lam + criterion(outs, target_b) * (1. - lam)  
+            
+            else:
+                outs = model(inputs)
+                loss = criterion(outs, labels)    
+                      
             preds = torch.argmax(outs, dim=-1)
-            loss = criterion(outs, labels)
-
             loss.backward()
             optimizer.step()
             scheduler.step()
@@ -256,7 +290,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, default='MaskBaseDataset', help='dataset augmentation type (default: MaskBaseDataset)')
     parser.add_argument('--augmentation', type=str, default='CustomAugmentation', help='data augmentation type (default: CustomAugmentation)')
     parser.add_argument("--resize", nargs="+", type=list, default=[224, 224], help='resize size for image when training')
-    parser.add_argument('--batch_size', type=int, default=32, help='input batch size for training (default: 32)')
+    parser.add_argument('--batch_size', type=int, default=128, help='input batch size for training (default: 128)')
     parser.add_argument('--valid_batch_size', type=int, default=1000, help='input batch size for validing (default: 1000)')
     parser.add_argument('--model', type=str, default='myResMLP', help='model type (default: myResMLP)')
     parser.add_argument('--optimizer', type=str, default='AdamW', help='optimizer type (default: AdamW)')
@@ -271,6 +305,11 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '../Input/data/train/images'))
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR', './model'))
 
+
+    # cutmix setting
+    parser.add_argument('--beta', default=0.2, type=float, help='hyperparameter beta')
+    parser.add_argument('--cutmix_prob', default=0.8, type=float, help='cutmix probability')
+
     args = parser.parse_args()
     print(args)
 
@@ -278,3 +317,5 @@ if __name__ == '__main__':
     model_dir = args.model_dir
 
     train(data_dir, model_dir, args)
+
+

@@ -59,9 +59,9 @@ class myResMLP(nn.Module):
         super().__init__()
         self.model = ResMLP(
             image_size = (224, 224),
-            patch_size = 16,
-            dim = 512,
-            depth = 12,
+            patch_size = 14,
+            dim = 256,
+            depth = 8,
             num_classes = num_classes
         )
 
