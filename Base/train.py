@@ -11,13 +11,16 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from dataset import MaskBaseDataset
 from loss import create_criterion
 
+import wandb
+import torchvision
+from sklearn.metrics import f1_score
 
 def seed_everything(seed):
     torch.manual_seed(seed)
@@ -84,6 +87,7 @@ def increment_path(path, exist_ok=False):
 
 
 def train(data_dir, model_dir, args):
+
     seed_everything(args.seed)
 
     save_dir = increment_path(os.path.join(model_dir, args.name))
@@ -91,6 +95,7 @@ def train(data_dir, model_dir, args):
     # -- settings
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
+
 
     # -- dataset
     dataset_module = getattr(import_module("dataset"), args.dataset)  # default: BaseAugmentation
@@ -144,12 +149,35 @@ def train(data_dir, model_dir, args):
         lr=args.lr,
         weight_decay=5e-4
     )
-    scheduler = StepLR(optimizer, args.lr_decay_step, gamma=0.5)
+    scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=0)
 
     # -- logging
     logger = SummaryWriter(log_dir=save_dir)
     with open(os.path.join(save_dir, 'config.json'), 'w', encoding='utf-8') as f:
         json.dump(vars(args), f, ensure_ascii=False, indent=4)
+
+    # -- parameter
+    NUM_EPOCH = args.epochs
+    BATCH_SIZE = args.batch_size
+    LEARNING_RATE = args.lr
+    SCHEDULAR = 'CosineAnnealingLR'
+    AUGMENTATION = args.augmentation
+    VAL_SPLIT = args.val_ratio
+
+    # -- wandb
+    wandb.login()
+    config = {
+    'epochs': NUM_EPOCH, 'batch_size': BATCH_SIZE, 'learning_rate': LEARNING_RATE,
+    'val_split': VAL_SPLIT, 'Schedular': SCHEDULAR,  'Augmentation': AUGMENTATION
+    }
+
+    wandb.init(project='image-classification-mask', 
+            entity='team-34', 
+            config=config
+            ) 
+    wandb.run.name = args.wandb_name 
+
+    wandb.watch(model)
 
     best_val_acc = 0
     best_val_loss = np.inf
@@ -158,6 +186,10 @@ def train(data_dir, model_dir, args):
         model.train()
         loss_value = 0
         matches = 0
+        train_f1 = 0
+        val_f1 = 0
+        n_iter = 0
+
         for idx, train_batch in enumerate(train_loader):
             inputs, labels = train_batch
             inputs = inputs.to(device)
@@ -172,11 +204,15 @@ def train(data_dir, model_dir, args):
             loss.backward()
             optimizer.step()
 
+            train_f1 += f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
+            n_iter += 1
+
             loss_value += loss.item()
             matches += (preds == labels).sum().item()
             if (idx + 1) % args.log_interval == 0:
                 train_loss = loss_value / args.log_interval
                 train_acc = matches / args.batch_size / args.log_interval
+                
                 current_lr = get_lr(optimizer)
                 print(
                     f"Epoch[{epoch}/{args.epochs}]({idx + 1}/{len(train_loader)}) || "
@@ -187,6 +223,20 @@ def train(data_dir, model_dir, args):
 
                 loss_value = 0
                 matches = 0
+
+        train_f1 /= n_iter
+        wandb.log({
+                    "train loss": train_loss,
+                    "train acc" : train_acc,
+                    "train f1": train_f1,
+                })
+                
+
+        # 각 에폭의 마지막 input 이미지로 grid view 생성
+        img_grid = torchvision.utils.make_grid(inputs)
+        # Tensorboard에 train input 이미지 기록
+        logger.add_image(f'{epoch}_train_input_img', img_grid, epoch)
+
 
         scheduler.step()
 
@@ -216,7 +266,7 @@ def train(data_dir, model_dir, args):
                     figure = grid_image(
                         inputs_np, labels, preds, n=16, shuffle=args.dataset != "MaskSplitByProfileDataset"
                     )
-
+            val_f1 = f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
             val_loss = np.sum(val_loss_items) / len(val_loader)
             val_acc = np.sum(val_acc_items) / len(val_set)
             best_val_loss = min(best_val_loss, val_loss)
@@ -234,6 +284,14 @@ def train(data_dir, model_dir, args):
             logger.add_figure("results", figure, epoch)
             print()
 
+            # wandb 검증 단계에서 Loss, Accuracy 로그 저장
+            wandb.log({
+                "validation loss": val_loss,
+                "validation acc" : val_acc, 
+                "validation f1": val_f1,
+            })
+
+    wandb.finish()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -244,7 +302,7 @@ if __name__ == '__main__':
 
     # Data and model checkpoints directories
     parser.add_argument('--seed', type=int, default=42, help='random seed (default: 42)')
-    parser.add_argument('--epochs', type=int, default=1, help='number of epochs to train (default: 1)')
+    parser.add_argument('--epochs', type=int, default=5, help='number of epochs to train (default: 5)')
     parser.add_argument('--dataset', type=str, default='MaskBaseDataset', help='dataset augmentation type (default: MaskBaseDataset)')
     parser.add_argument('--augmentation', type=str, default='BaseAugmentation', help='data augmentation type (default: BaseAugmentation)')
     parser.add_argument("--resize", nargs="+", type=list, default=[128, 96], help='resize size for image when training')
@@ -258,6 +316,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr_decay_step', type=int, default=20, help='learning rate scheduler deacy step (default: 20)')
     parser.add_argument('--log_interval', type=int, default=20, help='how many batches to wait before logging training status')
     parser.add_argument('--name', default='exp', help='model save at {SM_MODEL_DIR}/{name}')
+    parser.add_argument('--wandb_name', required=True, type=str, default='name_nth_modelname', help='model name shown in wandb. (Usage: name_nth_modelname, Example: seyoung_1st_resnet18')
 
     # Container environment
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '/opt/ml/input/data/train/images'))
