@@ -20,6 +20,9 @@ from loss import create_criterion
 
 import torch.optim as optim
 from tqdm import tqdm
+import wandb
+import torchvision
+from sklearn.metrics import f1_score
 
 def seed_everything(seed):
     torch.manual_seed(seed)
@@ -107,6 +110,7 @@ def rand_bbox(size, lam): # size : [Batch_size, Channel, Width, Height]
 
 
 def train(data_dir, model_dir, args):
+
     seed_everything(args.seed)
 
     save_dir = increment_path(os.path.join(model_dir, args.name))
@@ -114,6 +118,7 @@ def train(data_dir, model_dir, args):
     # -- settings
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
+
 
     # -- dataset
     dataset_module = getattr(import_module("dataset"), args.dataset)  # default: BaseAugmentation
@@ -173,13 +178,36 @@ def train(data_dir, model_dir, args):
     )
     """
     optimizer = optim.AdamW(model.parameters(),lr=1e-3)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10, eta_min=0.001)
+    scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=0)
 
     # -- logging
     logger = SummaryWriter(log_dir=save_dir)
     with open(os.path.join(save_dir, 'config.json'), 'w', encoding='utf-8') as f:
         json.dump(vars(args), f, ensure_ascii=False, indent=4)
-    
+
+    # -- parameter
+    NUM_EPOCH = args.epochs
+    BATCH_SIZE = args.batch_size
+    LEARNING_RATE = args.lr
+    SCHEDULAR = 'CosineAnnealingLR'
+    AUGMENTATION = args.augmentation
+    VAL_SPLIT = args.val_ratio
+
+    # -- wandb
+    wandb.login()
+    config = {
+    'epochs': NUM_EPOCH, 'batch_size': BATCH_SIZE, 'learning_rate': LEARNING_RATE,
+    'val_split': VAL_SPLIT, 'Schedular': SCHEDULAR,  'Augmentation': AUGMENTATION
+    }
+
+    wandb.init(project='image-classification-mask', 
+            entity='team-34', 
+            config=config
+            ) 
+    wandb.run.name = args.wandb_name 
+
+    wandb.watch(model)
+
     best_val_acc = 0
     best_val_loss = np.inf
     for epoch in range(args.epochs):
@@ -187,6 +215,10 @@ def train(data_dir, model_dir, args):
         model.train()
         loss_value = 0
         matches = 0
+        train_f1 = 0
+        val_f1 = 0
+        n_iter = 0
+
         for idx, train_batch in tqdm(enumerate(train_loader)):
             inputs, labels = train_batch
             inputs = inputs.to(device)
@@ -215,11 +247,15 @@ def train(data_dir, model_dir, args):
             optimizer.step()
             scheduler.step()
 
+            train_f1 += f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
+            n_iter += 1
+
             loss_value += loss.item()
             matches += (preds == labels).sum().item()
             if (idx + 1) % args.log_interval == 0:
                 train_loss = loss_value / args.log_interval
                 train_acc = matches / args.batch_size / args.log_interval
+                
                 current_lr = get_lr(optimizer)
                 print(
                     f"Epoch[{epoch}/{args.epochs}]({idx + 1}/{len(train_loader)}) || "
@@ -231,6 +267,21 @@ def train(data_dir, model_dir, args):
                 loss_value = 0
                 matches = 0
 
+        train_f1 /= n_iter
+        wandb.log({
+                    "train loss": train_loss,
+                    "train acc" : train_acc,
+                    "train f1": train_f1,
+                })
+                
+
+        # 각 에폭의 마지막 input 이미지로 grid view 생성
+        img_grid = torchvision.utils.make_grid(inputs)
+        # Tensorboard에 train input 이미지 기록
+        logger.add_image(f'{epoch}_train_input_img', img_grid, epoch)
+
+
+        scheduler.step()
 
         # val loop
         with torch.no_grad():
@@ -258,7 +309,7 @@ def train(data_dir, model_dir, args):
                     figure = grid_image(
                         inputs_np, labels, preds, n=16, shuffle=args.dataset != "MaskSplitByProfileDataset"
                     )
-
+            val_f1 = f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
             val_loss = np.sum(val_loss_items) / len(val_loader)
             val_acc = np.sum(val_acc_items) / len(val_set)
             best_val_loss = min(best_val_loss, val_loss)
@@ -276,6 +327,14 @@ def train(data_dir, model_dir, args):
             logger.add_figure("results", figure, epoch)
             print()
 
+            # wandb 검증 단계에서 Loss, Accuracy 로그 저장
+            wandb.log({
+                "validation loss": val_loss,
+                "validation acc" : val_acc, 
+                "validation f1": val_f1,
+            })
+
+    wandb.finish()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -300,6 +359,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr_decay_step', type=int, default=20, help='learning rate scheduler deacy step (default: 20)')
     parser.add_argument('--log_interval', type=int, default=20, help='how many batches to wait before logging training status')
     parser.add_argument('--name', default='exp', help='model save at {SM_MODEL_DIR}/{name}')
+    parser.add_argument('--wandb_name', required=True, type=str, default='name_nth_modelname', help='model name shown in wandb. (Usage: name_nth_modelname, Example: seyoung_1st_resnet18')
 
     # Container environment
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '../Input/data/train/images'))
