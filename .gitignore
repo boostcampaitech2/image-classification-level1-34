@@ -1,0 +1,13 @@
+# ignore image file
+/Input
+
+# ignore dotenv enviroment variables file
+.env
+
+# ignore pycache
+__pycache__
+
+# ignore model saved file and output file
+/Base/model
+/Base/output
+/Base/wandb
