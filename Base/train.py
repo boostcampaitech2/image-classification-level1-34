@@ -174,8 +174,8 @@ def train(data_dir, model_dir, args):
     wandb.init(project='image-classification-mask', 
             entity='team-34', 
             config=config
-            ) # project는 옆에 이름으로 생성해두었습니다.
-    wandb.run.name = args.wandb_name # 회차 이름 명명 규칙 필요할 것 같음. ex) {이름}_{회차}_{모델명} 
+            ) 
+    wandb.run.name = args.wandb_name 
 
     wandb.watch(model)
 

@@ -1,8 +1,0 @@
-
-Epoch[0/1](20/236) || training loss 2.853 || training accuracy 12.97% || lr 0.001
-Traceback (most recent call last):
-  File "train.py", line 318, in <module>
-    train(data_dir, model_dir, args)
-  File "train.py", line 221, in train
-    "Train F1 score": train_f1,
-NameError: name 'train_f1' is not defined

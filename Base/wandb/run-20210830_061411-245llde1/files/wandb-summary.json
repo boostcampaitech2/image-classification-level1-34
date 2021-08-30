@@ -1,1 +1,0 @@
-{"train loss": 2.7124134421348574, "train acc": 0.20625, "train f1": 0.02501367330849883, "_runtime": 32, "_timestamp": 1630304083, "_step": 1, "Valid loss": 2.7250855763753257, "Valid acc": 0.15264550264550264, "Valid F1 score": 0.01774042950513539, "_wandb": {"runtime": 33}}
