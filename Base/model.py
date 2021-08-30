@@ -58,7 +58,7 @@ class myResMLP(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
         self.model = ResMLP(
-            image_size = (128, 96),
+            image_size = (224, 224),
             patch_size = 16,
             dim = 512,
             depth = 12,
