@@ -151,7 +151,7 @@ def train(data_dir, model_dir, args):
     val_loader = DataLoader(
         val_set,
         batch_size=args.valid_batch_size,
-#        num_workers=multiprocessing.cpu_count()//3, 
+#        num_workers=multiprocessing.cpu_count()//2, 
         shuffle=False,
         pin_memory=use_cuda,
         drop_last=True,
@@ -176,9 +176,10 @@ def train(data_dir, model_dir, args):
         lr=args.lr,
         weight_decay=5e-4
     )
-    """
     optimizer = optim.AdamW(model.parameters(),lr=1e-3)
-    scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=0)
+    """
+    optimizer = optim.Adam(model.parameters(),lr=1e-3)
+    scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=0.0001)
 
     # -- logging
     logger = SummaryWriter(log_dir=save_dir)
@@ -219,7 +220,7 @@ def train(data_dir, model_dir, args):
         val_f1 = 0
         n_iter = 0
 
-        for idx, train_batch in tqdm(enumerate(train_loader)):
+        for idx, train_batch in enumerate(tqdm(train_loader)):
             inputs, labels = train_batch
             inputs = inputs.to(device)
             labels = labels.to(device)
@@ -348,27 +349,26 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=50, help='number of epochs to train (default: 50)')
     parser.add_argument('--dataset', type=str, default='MaskBaseDataset', help='dataset augmentation type (default: MaskBaseDataset)')
     parser.add_argument('--augmentation', type=str, default='CustomAugmentation', help='data augmentation type (default: CustomAugmentation)')
-    parser.add_argument("--resize", nargs="+", type=list, default=[160, 160], help='resize size for image when training')
+    parser.add_argument("--resize", nargs="+", type=list, default=[224, 224], help='resize size for image when training')
     parser.add_argument('--batch_size', type=int, default=128, help='input batch size for training (default: 128)')
     parser.add_argument('--valid_batch_size', type=int, default=1000, help='input batch size for validing (default: 1000)')
-    parser.add_argument('--model', type=str, default='myInceptionResnet', help='model type (default: myInceptionResnet)')
-    parser.add_argument('--optimizer', type=str, default='AdamW', help='optimizer type (default: AdamW)')
+    parser.add_argument('--model', type=str, default='myResMLP', help='model type (default: myResMLP)')
+    parser.add_argument('--optimizer', type=str, default='Adam', help='optimizer type (default: Adam)')
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate (default: 1e-3)')
     parser.add_argument('--val_ratio', type=float, default=0.2, help='ratio for validaton (default: 0.2)')
     parser.add_argument('--criterion', type=str, default='label_smoothing', help='criterion type (default: label_smoothing)')
     parser.add_argument('--lr_decay_step', type=int, default=20, help='learning rate scheduler deacy step (default: 20)')
     parser.add_argument('--log_interval', type=int, default=20, help='how many batches to wait before logging training status')
     parser.add_argument('--name', default='exp', help='model save at {SM_MODEL_DIR}/{name}')
-    parser.add_argument('--wandb_name', type=str, default='JIN_2nd_InceptionRes with cutmix', help='model name shown in wandb.')
+    parser.add_argument('--wandb_name', type=str, default='JIN_5th_ResMLP with cutmix, Adam', help='model name shown in wandb.')
 
     # Container environment
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '../Input/data/train/images'))
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR', './model'))
 
-
     # cutmix setting
-    parser.add_argument('--beta', default=0.2, type=float, help='hyperparameter beta')
-    parser.add_argument('--cutmix_prob', default=0, type=float, help='cutmix probability')
+    parser.add_argument('--beta', default=0.1, type=float, help='hyperparameter beta')
+    parser.add_argument('--cutmix_prob', default=0.8, type=float, help='cutmix probability')
 
     args = parser.parse_args()
     print(args)

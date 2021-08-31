@@ -52,8 +52,10 @@ class AddGaussianNoise(object):
 
 class CustomAugmentation:
     def __init__(self, resize, mean, std, **args):
-        self.transform = transforms.Compose([
-            CenterCrop((320, 256)),
+        self.transform1 = transforms.Compose(
+            [CenterCrop((320, 256))]
+            )
+        self.transform2 = transforms.Compose([
             Resize(resize, Image.BILINEAR),
             ColorJitter(0.1, 0.1, 0.1, 0.1),
             ToTensor(),
@@ -62,7 +64,12 @@ class CustomAugmentation:
         ])
 
     def __call__(self, image):
-        return self.transform(image)
+        if sum(image.size() == (3, 200, 200):
+            pass
+        else:
+            image = self.transform1(image)
+        image = self.transform2(image)
+        return image
 
 
 class MaskLabels(int, Enum):
@@ -100,7 +107,7 @@ class AgeLabels(int, Enum):
 
         if value < 30:
             return cls.YOUNG
-        elif value < 60:
+        elif value < 60:  # default 60
             return cls.MIDDLE
         else:
             return cls.OLD
