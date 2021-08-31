@@ -301,6 +301,7 @@ def train(data_dir, model_dir, args):
                 n_iter = 0
                 figure = None
                 for idx, val_batch in  enumerate(val_loader):
+
                     inputs, labels = val_batch
                     inputs = inputs.to(device)
                     labels = labels.to(device)
@@ -322,9 +323,9 @@ def train(data_dir, model_dir, args):
                             inputs_np, labels, preds, n=16, shuffle=args.dataset != "MaskSplitByProfileDataset"
                         )
 
-                val_f1 = val_f1 / n_iter
-                val_loss = val_loss / len(val_loader)
-                val_acc = val_acc / len(val_loader)
+                val_f1 = val_f1 / len(val_loader)
+                val_loss = val_loss / len(val_loader.dataset)
+                val_acc = val_acc / len(val_loader.dataset)
 
                 best_val_loss = min(best_val_loss, val_loss)
 
@@ -385,7 +386,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr_decay_step', type=int, default=20, help='learning rate scheduler deacy step (default: 20)')
     parser.add_argument('--log_interval', type=int, default=20, help='how many batches to wait before logging training status')
     parser.add_argument('--name', default='exp', help='model save at {SM_MODEL_DIR}/{name}')
-    parser.add_argument('--wandb_name', required=True, type=str, default='name_nth_modelname', help='model name shown in wandb. (Usage: name_nth_modelname, Example: seyoung_1st_resnet18')
+    parser.add_argument('--wandb_name', required=False, type=str, default='name_nth_modelname', help='model name shown in wandb. (Usage: name_nth_modelname, Example: seyoung_1st_resnet18')
 
     # Container environment
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '/opt/ml/P01/data/train/images'))
