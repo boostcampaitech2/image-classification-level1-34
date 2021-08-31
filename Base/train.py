@@ -72,7 +72,6 @@ def grid_image(np_images, gts, preds, n=16, shuffle=False):
 
 def increment_path(path, exist_ok=False):
     """ Automatically increment path, i.e. runs/exp --> runs/exp0, runs/exp1 etc.
-
     Args:
         path (str or pathlib.Path): f"{model_dir}/{args.name}".
         exist_ok (bool): whether increment path (increment if False).
@@ -243,7 +242,6 @@ def train(data_dir, model_dir, args):
             train_loss = 0
             train_acc = 0
             train_f1 = 0
-            n_iter = 0
 
             for idx, train_batch in enumerate(train_loader):
                 inputs, labels = train_batch
@@ -260,31 +258,31 @@ def train(data_dir, model_dir, args):
                 optimizer.step()
                 #scheduler.step()
 
-                train_f1 += f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
-                n_iter += 1
-
                 train_loss += loss.item()
                 train_acc += (preds == labels).sum().item()
+                train_f1 += f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
+                
                 if (idx + 1) % args.log_interval == 0:
-                    train_loss = train_loss / args.log_interval
-                    train_acc = train_acc / args.batch_size / args.log_interval
+                    middle_train_loss = train_loss / (idx + 1)
+                    middle_train_acc = train_acc / (args.batch_size * (idx+1))
+                    middle_f1 = train_f1/(idx+1)
                     
                     current_lr = get_lr(optimizer)
                     print(
                         f"Epoch[{epoch}/{args.epochs}]({idx + 1}/{len(train_loader)}) || "
-                        f"training loss {train_loss:4.4} || training accuracy {train_acc:4.2%} || lr {current_lr}"
+                        f"training loss {middle_train_loss:4.4}  || training f1 {middle_f1:4.2%} || training accuracy {middle_train_acc:4.2%} || lr {current_lr}"
                     )
                     logger.add_scalar("Train/loss", train_loss, epoch * len(train_loader) + idx)
                     logger.add_scalar("Train/accuracy", train_acc, epoch * len(train_loader) + idx)
-
-                    train_loss = 0
-                    train_acc = 0
             
-            train_f1 /= n_iter
+            final_train_loss = train_loss / (len(train_loader))
+            final_train_acc = train_acc / (len(train_loader))
+            final_train_f1 = train_f1/(idx+1)
+
             wandb.log({
-                        "train loss": train_loss,
-                        "train acc" : train_acc,
-                        "train f1": train_f1,
+                        "train loss": final_train_loss,
+                        "train acc" : final_train_acc,
+                        "train f1": final_train_f1,
                     })
             
 
@@ -299,11 +297,11 @@ def train(data_dir, model_dir, args):
                 print("Calculating validation results...")
                 model.eval()
                 val_loss = 0
-                val_acc = 0
-                val_f1 = 0
+                val_acc = 0.6 # 초기값 설정 : 이것보다 넘겨야 저장
+                val_f1 = 0.6 # 초기값 설정 : 이것보다 넘겨야 저장
                 n_iter = 0
                 figure = None
-                for val_batch in val_loader:
+                for idx, val_batch in  enumerate(val_loader):
                     inputs, labels = val_batch
                     inputs = inputs.to(device)
                     labels = labels.to(device)
@@ -317,7 +315,6 @@ def train(data_dir, model_dir, args):
                     val_loss += loss_item
                     val_acc += acc_item
                     val_f1 += f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
-                    n_iter += 1
 
                     if figure is None:
                         inputs_np = torch.clone(inputs).detach().cpu().permute(0, 2, 3, 1).numpy()
@@ -328,13 +325,16 @@ def train(data_dir, model_dir, args):
 
                 val_f1 = val_f1 / n_iter
                 val_loss = val_loss / len(val_loader)
-                val_acc = val_acc / len(valid_idx)
+                val_acc = val_acc / len(val_loader)
+
                 best_val_loss = min(best_val_loss, val_loss)
+
                 if val_acc > best_val_acc or val_f1 > best_val_f1:
                     print(f"New best model for val accuracy or f1 : {val_acc:4.2%}|| {val_f1:4.2%}! saving the best model..")
                     torch.save(model.module.state_dict(), f"{save_dir}/{fold}_{epoch}_accuracy_{val_acc:4.2%}_f1_{val_f1:4.2%}.pth")
                     best_val_acc = val_acc
                     best_val_f1 = val_f1
+                    
                 print(
                     f"[Val] acc : {val_acc:4.2%}, loss: {val_loss:4.2} || "
                     f"best f1 : {best_val_f1:4.2%},best acc : {best_val_acc:4.2%}, best loss: {best_val_loss:4.2}"
