@@ -179,8 +179,6 @@ def train(data_dir, model_dir, args):
         # 생성한 train, valid DataLoader로 이전과 같이 모델 학습을 진행합니다. 
         train_loader, val_loader = getDataloader(dataset, train_idx, valid_idx, batch_size, num_workers)
 
-
-
         # -- model
         model_module = getattr(import_module("model"), args.model)  # default: BaseModel
         model = model_module(
@@ -333,11 +331,11 @@ def train(data_dir, model_dir, args):
                         )
                 val_f1 = f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
                 val_loss = np.sum(val_loss_items) / len(val_loader)
-                val_acc = np.sum(val_acc_items) / len(valid_idx) ## 이상함 ㅋㅋㅋㅋㅋ
+                val_acc = np.sum(val_acc_items) / len(valid_idx) 
                 best_val_loss = min(best_val_loss, val_loss)
                 if val_acc > best_val_acc or val_f1 > best_val_f1:
                     print(f"New best model for val accuracy or f1 : {val_acc:4.2%}|| {val_f1:4.2%}! saving the best model..")
-                    torch.save(model.module.state_dict(), f"{save_dir}/{fold}_{epoch}_accuracy_{val_acc:4.2%}_f1_{val_f1:4.2%}.pth")
+                    torch.save(model.module.state_dict(), f"{save_dir}/{args.model}_{fold}_{epoch}_accuracy_{val_acc:4.2%}_f1_{val_f1:4.2%}.pth")
                     best_val_acc = val_acc
                     best_val_f1 = val_f1
                 print(
@@ -376,7 +374,7 @@ if __name__ == '__main__':
 
     # Data and model checkpoints directories
     parser.add_argument('--seed', type=int, default=42, help='random seed (default: 42)')
-    parser.add_argument('--epochs', type=int, default=5, help='number of epochs to train (default: 5)')
+    parser.add_argument('--epochs', type=int, default=30, help='number of epochs to train (default: 30)')
     parser.add_argument('--dataset', type=str, default='MaskSplitByProfileDataset', help='dataset augmentation type (default: MaskSplitByProfileDataset)')
     parser.add_argument('--augmentation', type=str, default='BaseAugmentation', help='data augmentation type (default: BaseAugmentation)')
     parser.add_argument("--resize", nargs="+", type=list, default=[128, 96], help='resize size for image when training')
@@ -386,12 +384,11 @@ if __name__ == '__main__':
     parser.add_argument('--optimizer', type=str, default='AdamW', help='optimizer type (default: AdamW)')
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate (default: 1e-3)')
     parser.add_argument('--val_ratio', type=float, default=0.2, help='ratio for validaton (default: 0.2)')
-    parser.add_argument('--criterion', type=str, default='label_smoothing', help='criterion type (default: label_smoothing)')
+    parser.add_argument('--criterion', type=str, default='cross_entropy', help='criterion type (default: cross_entropy)')
     parser.add_argument('--lr_decay_step', type=int, default=20, help='learning rate scheduler deacy step (default: 20)')
     parser.add_argument('--log_interval', type=int, default=20, help='how many batches to wait before logging training status')
     parser.add_argument('--name', default='exp', help='model save at {SM_MODEL_DIR}/{name}')
-    parser.add_argument('--wandb_name', type=str, default='JIN_5th_ResMLP with cutmix, Adam', help='model name shown in wandb.')
-
+    parser.add_argument('--wandb_name', required=True, type=str, default='name_nth_modelname', help='model name shown in wandb. (Usage: name_nth_modelname, Example: seyoung_1st_resnet18')
     # Container environment
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '../Input/data/train/images'))
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR', './model'))
@@ -407,5 +404,3 @@ if __name__ == '__main__':
     model_dir = args.model_dir
 
     train(data_dir, model_dir, args)
-
-

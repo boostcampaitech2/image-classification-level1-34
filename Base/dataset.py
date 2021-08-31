@@ -55,7 +55,7 @@ class AddGaussianNoise(object):
     def __repr__(self):
         return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
 
-
+'''
     def get_transforms(need=('train', 'val'), img_size=(512, 384), mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246)):
         """
         train 혹은 validation의 augmentation 함수를 정의합니다. train은 데이터에 많은 변형을 주어야하지만, validation에는 최소한의 전처리만 주어져야합니다.
@@ -88,8 +88,8 @@ class AddGaussianNoise(object):
                 ToTensorV2(p=1.0),
             ], p=1.0)
         return transformations
-
-
+'''
+'''
 class CustomAugmentation:
     def __init__(self, img_size=(512, 384), mean=(0.5, 0.5, 0.5), std=(0.2, 0.2, 0.2), **args):
         self.transformations = {}
@@ -110,7 +110,7 @@ class CustomAugmentation:
         ], p=1.0)
     def __call__(self, image):
         return self.transformations
-
+'''
 
 class MaskLabels(int, Enum):
     MASK = 0

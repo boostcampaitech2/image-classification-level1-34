@@ -9,8 +9,8 @@ import time
 from glob import glob
 
 
-LOAD_TRAIN_DIR = '/opt/ml/input/data/train/images'
-SAVE_TRAIN_DIR = '/opt/ml/input/data/train/newimages'
+LOAD_TRAIN_DIR = '../Input/data/train/images'
+SAVE_TRAIN_DIR = '../Input/data/train/newimages'
 
 device = "cuda"
 mtcnn = MTCNN(device = device, thresholds = [0.60, 0.70, 0.70], min_face_size = 80)
