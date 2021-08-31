@@ -296,15 +296,19 @@ def train(data_dir, model_dir, args):
             with torch.no_grad():
                 print("Calculating validation results...")
                 model.eval()
+                # Threshold - 이 값 넘겨야 저장
+                val_acc_c = 0.6
+                val_f1_c = 0.6
                 val_loss = 0
-                val_acc = 0.6 # 초기값 설정 : 이것보다 넘겨야 저장
-                val_f1 = 0.6 # 초기값 설정 : 이것보다 넘겨야 저장
-                n_iter = 0
+                val_acc = 0
+                val_f1 = 0
                 figure = None
-                for idx, val_batch in  enumerate(val_loader):
+                n_iter = 0
+                for idx, val_batch in enumerate(val_loader):
                     inputs, labels = val_batch
                     inputs = inputs.to(device)
                     labels = labels.to(device)
+                    #print(len(labels))
 
                     outs = model(inputs)
                     preds = torch.argmax(outs, dim=-1)
@@ -322,10 +326,12 @@ def train(data_dir, model_dir, args):
                         figure = grid_image(
                             inputs_np, labels, preds, n=16, shuffle=args.dataset != "MaskSplitByProfileDataset"
                         )
+                    n_iter += 1
 
                 val_f1 = val_f1 / n_iter
-                val_loss = val_loss / len(val_loader)
-                val_acc = val_acc / len(val_loader)
+                val_loss = val_loss / len(val_loader.dataset)
+                val_acc = val_acc / len(val_loader.dataset)
+                #print(len(val_loader))
 
                 best_val_loss = min(best_val_loss, val_loss)
 
