@@ -52,7 +52,6 @@ class ResNet18(nn.Module):
         x = self.net(x)
         return x
 
-<<<<<<< HEAD
 # ResMLP model
 from res_mlp_pytorch import ResMLP
 
@@ -85,7 +84,6 @@ class myInceptionResnet(nn.Module): # 160, 160
     def forward(self, x):
         x = self.model(x)
         return x
-=======
 
 class FaceNet(nn.Module):
     def __init__(self, num_classes):
@@ -100,4 +98,3 @@ class FaceNet(nn.Module):
     def forward(self, x):
         x = self.net(x)
         return x
->>>>>>> origin/main

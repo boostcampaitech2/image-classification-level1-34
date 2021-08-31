@@ -19,7 +19,6 @@ from dataset import MaskBaseDataset
 from loss import create_criterion
 
 import torch.optim as optim
-from tqdm import tqdm
 import wandb
 import torchvision
 from sklearn.metrics import f1_score
@@ -169,165 +168,6 @@ def train(data_dir, model_dir, args):
     )
     dataset.set_transform(transform)
 
-<<<<<<< HEAD
-    # -- data_loader
-    train_set, val_set = dataset.split_dataset()
-
-    train_loader = DataLoader(
-        train_set,
-        batch_size=args.batch_size,
-        num_workers=multiprocessing.cpu_count()//2, 
-        shuffle=True,
-        pin_memory=use_cuda,
-        drop_last=True,
-    )
-
-    val_loader = DataLoader(
-        val_set,
-        batch_size=args.valid_batch_size,
-#        num_workers=multiprocessing.cpu_count()//2, 
-        shuffle=False,
-        pin_memory=use_cuda,
-        drop_last=True,
-    )
-
-    # -- model
-    model_module = getattr(import_module("model"), args.model)  # default: BaseModel
-    model = model_module(
-        num_classes=num_classes
-    ).to(device)
-    model = torch.nn.DataParallel(model)
-    """
-    model_path = os.path.join('./model/exp18', 'best.pth')    
-    model.load_state_dict(torch.load(model_path, map_location=device))
-    """ 
-    # -- loss & metric
-    criterion = create_criterion(args.criterion)  # default: cross_entropy
-    """
-    opt_module = getattr(import_module("torch.optim"), args.optimizer)  # default: SGD
-    optimizer = opt_module(
-        filter(lambda p: p.requires_grad, model.parameters()),
-        lr=args.lr,
-        weight_decay=5e-4
-    )
-    optimizer = optim.AdamW(model.parameters(),lr=1e-3)
-    """
-    optimizer = optim.Adam(model.parameters(),lr=1e-3)
-    scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=0.0001)
-
-    # -- logging
-    logger = SummaryWriter(log_dir=save_dir)
-    with open(os.path.join(save_dir, 'config.json'), 'w', encoding='utf-8') as f:
-        json.dump(vars(args), f, ensure_ascii=False, indent=4)
-
-    # -- parameter
-    NUM_EPOCH = args.epochs
-    BATCH_SIZE = args.batch_size
-    LEARNING_RATE = args.lr
-    SCHEDULAR = 'CosineAnnealingLR'
-    AUGMENTATION = args.augmentation
-    VAL_SPLIT = args.val_ratio
-
-    # -- wandb
-    wandb.login()
-    config = {
-    'epochs': NUM_EPOCH, 'batch_size': BATCH_SIZE, 'learning_rate': LEARNING_RATE,
-    'val_split': VAL_SPLIT, 'Schedular': SCHEDULAR,  'Augmentation': AUGMENTATION
-    }
-
-    wandb.init(project='image-classification-mask', 
-            entity='team-34', 
-            config=config
-            ) 
-    wandb.run.name = args.wandb_name 
-
-    wandb.watch(model)
-
-    best_val_acc = 0
-    best_val_loss = np.inf
-    for epoch in range(args.epochs):
-        # train loop
-        model.train()
-        loss_value = 0
-        matches = 0
-        train_f1 = 0
-        val_f1 = 0
-        n_iter = 0
-
-        for idx, train_batch in enumerate(tqdm(train_loader)):
-            inputs, labels = train_batch
-            inputs = inputs.to(device)
-            labels = labels.to(device)
-
-            optimizer.zero_grad()
-            
-            r = np.random.rand(1)
-            if args.beta > 0 and  r < args.cutmix_prob:     
-                lam = np.random.beta(args.beta, args.beta)
-                rand_index = torch.randperm(inputs.size()[0]).to(device)
-                target_a = labels 
-                target_b = labels[rand_index]        
-                bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam)
-                inputs[:, :, bbx1:bbx2, bby1:bby2] = inputs[rand_index, :, bbx1:bbx2, bby1:bby2]
-                lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
-                outs = model(inputs)
-                loss = criterion(outs, target_a) * lam + criterion(outs, target_b) * (1. - lam)  
-            
-            else:
-                outs = model(inputs)
-                loss = criterion(outs, labels)    
-                      
-            preds = torch.argmax(outs, dim=-1)
-            loss.backward()
-            optimizer.step()
-            scheduler.step()
-
-            train_f1 += f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
-            n_iter += 1
-
-            loss_value += loss.item()
-            matches += (preds == labels).sum().item()
-            if (idx + 1) % args.log_interval == 0:
-                train_loss = loss_value / args.log_interval
-                train_acc = matches / args.batch_size / args.log_interval
-                
-                current_lr = get_lr(optimizer)
-                print(
-                    f"Epoch[{epoch}/{args.epochs}]({idx + 1}/{len(train_loader)}) || "
-                    f"training loss {train_loss:4.4} || training accuracy {train_acc:4.2%} || lr {current_lr}"
-                )
-                logger.add_scalar("Train/loss", train_loss, epoch * len(train_loader) + idx)
-                logger.add_scalar("Train/accuracy", train_acc, epoch * len(train_loader) + idx)
-
-                loss_value = 0
-                matches = 0
-
-        train_f1 /= n_iter
-        wandb.log({
-                    "train loss": train_loss,
-                    "train acc" : train_acc,
-                    "train f1": train_f1,
-                })
-                
-
-        # 각 에폭의 마지막 input 이미지로 grid view 생성
-        img_grid = torchvision.utils.make_grid(inputs)
-        # Tensorboard에 train input 이미지 기록
-        logger.add_image(f'{epoch}_train_input_img', img_grid, epoch)
-
-
-        scheduler.step()
-
-        # val loop
-        with torch.no_grad():
-            print("Calculating validation results...")
-            model.eval()
-            val_loss_items = []
-            val_acc_items = []
-            figure = None
-            for val_batch in val_loader:
-                inputs, labels = val_batch
-=======
     # 5-fold Stratified KFold 5개의 fold를 형성하고 5번 Cross Validation을 진행합니다.
     n_splits = 5
     skf = StratifiedKFold(n_splits=n_splits)
@@ -350,12 +190,15 @@ def train(data_dir, model_dir, args):
 
         # -- loss & metric
         criterion = create_criterion(args.criterion)  # default: cross_entropy
-        opt_module = getattr(import_module("torch.optim"), args.optimizer)  # default: AdamW
+        """
+        opt_module = getattr(import_module("torch.optim"), args.optimizer)  # default: SGD
         optimizer = opt_module(
             filter(lambda p: p.requires_grad, model.parameters()),
             lr=args.lr,
             weight_decay=5e-4
         )
+        """
+        optimizer = optim.AdamW(model.parameters(),lr=1e-3)
         #scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=0)
 
         # -- logging
@@ -403,20 +246,32 @@ def train(data_dir, model_dir, args):
 
             for idx, train_batch in enumerate(train_loader):
                 inputs, labels = train_batch
->>>>>>> origin/main
                 inputs = inputs.to(device)
                 labels = labels.to(device)
 
-                optimizer.zero_grad()
+                optimizer.zero_grad()   
 
-                outs = model(inputs)
+                r = np.random.rand(1)
+                if args.beta > 0 and  r < args.cutmix_prob:     
+                    lam = np.random.beta(args.beta, args.beta)
+                    rand_index = torch.randperm(inputs.size()[0]).to(device)
+                    target_a = labels 
+                    target_b = labels[rand_index]        
+                    bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam)
+                    inputs[:, :, bbx1:bbx2, bby1:bby2] = inputs[rand_index, :, bbx1:bbx2, bby1:bby2]
+                    lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
+                    outs = model(inputs)
+                    loss = criterion(outs, target_a) * lam + criterion(outs, target_b) * (1. - lam)  
+                
+                else:
+                    outs = model(inputs)
+                    loss = criterion(outs, labels)    
+
                 preds = torch.argmax(outs, dim=-1)
-                loss = criterion(outs, labels)
-
                 loss.backward()
                 optimizer.step()
                 #scheduler.step()
-
+                
                 train_f1 += f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
                 n_iter += 1
 
@@ -431,27 +286,6 @@ def train(data_dir, model_dir, args):
                         f"Epoch[{epoch}/{args.epochs}]({idx + 1}/{len(train_loader)}) || "
                         f"training loss {train_loss:4.4} || training accuracy {train_acc:4.2%} || lr {current_lr}"
                     )
-<<<<<<< HEAD
-            val_f1 = f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
-            val_loss = np.sum(val_loss_items) / len(val_loader)
-            val_acc = np.sum(val_acc_items) / len(val_set)
-            best_val_loss = min(best_val_loss, val_loss)
-            if val_acc > best_val_acc:
-                print(f"New best model for val accuracy : {val_acc:4.2%}! saving the best model..")
-                torch.save(model.module.state_dict(), f"{save_dir}/{epoch}_best.pth")
-                best_val_acc = val_acc
-            torch.save(model.module.state_dict(), f"{save_dir}/last.pth")
-            print(
-                f"[Val] acc : {val_acc:4.2%}, loss: {val_loss:4.2} || "
-                f"best acc : {best_val_acc:4.2%}, best loss: {best_val_loss:4.2}"
-            )
-            logger.add_scalar("Val/loss", val_loss, epoch)
-            logger.add_scalar("Val/accuracy", val_acc, epoch)
-            logger.add_figure("results", figure, epoch)
-            print()
-
-            # wandb 검증 단계에서 Loss, Accuracy 로그 저장
-=======
                     logger.add_scalar("Train/loss", train_loss, epoch * len(train_loader) + idx)
                     logger.add_scalar("Train/accuracy", train_acc, epoch * len(train_loader) + idx)
 
@@ -459,7 +293,6 @@ def train(data_dir, model_dir, args):
                     matches = 0
             
             train_f1 /= n_iter
->>>>>>> origin/main
             wandb.log({
                         "train loss": train_loss,
                         "train acc" : train_acc,
@@ -471,7 +304,6 @@ def train(data_dir, model_dir, args):
             img_grid = torchvision.utils.make_grid(inputs)
             # Tensorboard에 train input 이미지 기록
             logger.add_image(f'{epoch}_train_input_img', img_grid, epoch)
-            
 
             # val loop
             with torch.no_grad():
@@ -544,16 +376,6 @@ if __name__ == '__main__':
 
     # Data and model checkpoints directories
     parser.add_argument('--seed', type=int, default=42, help='random seed (default: 42)')
-<<<<<<< HEAD
-    parser.add_argument('--epochs', type=int, default=50, help='number of epochs to train (default: 50)')
-    parser.add_argument('--dataset', type=str, default='MaskBaseDataset', help='dataset augmentation type (default: MaskBaseDataset)')
-    parser.add_argument('--augmentation', type=str, default='CustomAugmentation', help='data augmentation type (default: CustomAugmentation)')
-    parser.add_argument("--resize", nargs="+", type=list, default=[224, 224], help='resize size for image when training')
-    parser.add_argument('--batch_size', type=int, default=128, help='input batch size for training (default: 128)')
-    parser.add_argument('--valid_batch_size', type=int, default=1000, help='input batch size for validing (default: 1000)')
-    parser.add_argument('--model', type=str, default='myResMLP', help='model type (default: myResMLP)')
-    parser.add_argument('--optimizer', type=str, default='Adam', help='optimizer type (default: Adam)')
-=======
     parser.add_argument('--epochs', type=int, default=5, help='number of epochs to train (default: 5)')
     parser.add_argument('--dataset', type=str, default='MaskSplitByProfileDataset', help='dataset augmentation type (default: MaskSplitByProfileDataset)')
     parser.add_argument('--augmentation', type=str, default='BaseAugmentation', help='data augmentation type (default: BaseAugmentation)')
@@ -562,7 +384,6 @@ if __name__ == '__main__':
     parser.add_argument('--valid_batch_size', type=int, default=1000, help='input batch size for validing (default: 1000)')
     parser.add_argument('--model', type=str, default='ResNet18', help='model type (default: ResNet18)')
     parser.add_argument('--optimizer', type=str, default='AdamW', help='optimizer type (default: AdamW)')
->>>>>>> origin/main
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate (default: 1e-3)')
     parser.add_argument('--val_ratio', type=float, default=0.2, help='ratio for validaton (default: 0.2)')
     parser.add_argument('--criterion', type=str, default='label_smoothing', help='criterion type (default: label_smoothing)')
@@ -577,7 +398,7 @@ if __name__ == '__main__':
 
     # cutmix setting
     parser.add_argument('--beta', default=0.1, type=float, help='hyperparameter beta')
-    parser.add_argument('--cutmix_prob', default=0.8, type=float, help='cutmix probability')
+    parser.add_argument('--cutmix_prob', default=0, type=float, help='cutmix probability')
 
     args = parser.parse_args()
     print(args)
