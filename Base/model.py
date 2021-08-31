@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 import math
+from facenet_pytorch import MTCNN, InceptionResnetV1
 
 
 class BaseModel(nn.Module):
@@ -42,11 +43,26 @@ class ResNet18(nn.Module):
         super().__init__()
         self.net = torchvision.models.resnet18(pretrained=True)
 
-        self.net.fc = torch.nn.Linear(in_features=512, out_features=18, bias=True)
+        self.net.fc = torch.nn.Linear(in_features=512, out_features=num_classes, bias=True)
 
         torch.nn.init.xavier_uniform_(self.net.fc.weight)
         stdv = 1. / math.sqrt(self.net.fc.weight.size(1))
         self.net.fc.bias.data.uniform_(-stdv, stdv)
+
+    def forward(self, x):
+        x = self.net(x)
+        return x
+
+
+class FaceNet(nn.Module):
+    def __init__(self, num_classes):
+        super().__init__()
+        self.net = InceptionResnetV1(pretrained='vggface2')
+        self.net.logits = torch.nn.Linear(in_features=512, out_features=num_classes, bias=True)
+
+        torch.nn.init.xavier_uniform_(self.net.logits.weight)
+        stdv = 1. / math.sqrt(self.net.logits.weight.size(1))
+        self.net.logits.bias.data.uniform_(-stdv, stdv)
 
     def forward(self, x):
         x = self.net(x)

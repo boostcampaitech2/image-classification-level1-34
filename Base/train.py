@@ -90,7 +90,7 @@ def train(data_dir, model_dir, args):
 
     seed_everything(args.seed)
 
-    save_dir = increment_path(os.path.join(model_dir, args.name))
+    save_dir = increment_path(os.path.join(model_dir, args.wandb_name))
 
     # -- settings
     use_cuda = torch.cuda.is_available()
@@ -98,23 +98,21 @@ def train(data_dir, model_dir, args):
 
 
     # -- dataset
-    dataset_module = getattr(import_module("dataset"), args.dataset)  # default: BaseAugmentation
+    dataset_module = getattr(import_module("dataset"), args.dataset)
     dataset = dataset_module(
         data_dir=data_dir,
     )
     num_classes = dataset.num_classes  # 18
 
     # -- augmentation
-    transform_module = getattr(import_module("dataset"), args.augmentation)  # default: BaseAugmentation
-    transform = transform_module(
-        resize=args.resize,
-        mean=dataset.mean,
-        std=dataset.std,
-    )
+    transform_module = getattr(import_module("dataset"), args.augmentation)  # default: CustomAugmentation
+    transform = transform_module()
     dataset.set_transform(transform)
 
     # -- data_loader
     train_set, val_set = dataset.split_dataset()
+    #train_set.dataset.set_transform(transform.transformations['train'])
+    #val_set.dataset.set_transform(transform.transformations['val'])
     #train_set, val_set = dataset.split_dataset_kfold()
 
     train_loader = DataLoader(
@@ -144,7 +142,7 @@ def train(data_dir, model_dir, args):
 
     # -- loss & metric
     criterion = create_criterion(args.criterion)  # default: cross_entropy
-    opt_module = getattr(import_module("torch.optim"), args.optimizer)  # default: SGD
+    opt_module = getattr(import_module("torch.optim"), args.optimizer)  # default: AdamW
     optimizer = opt_module(
         filter(lambda p: p.requires_grad, model.parameters()),
         lr=args.lr,
@@ -196,6 +194,8 @@ def train(data_dir, model_dir, args):
             inputs, labels = train_batch
             inputs = inputs.to(device)
             labels = labels.to(device)
+            #inputs = torch.stack(list(inputs), dim=0).to(device)
+            #labels = torch.stack(list(labels)).to(device)
 
             optimizer.zero_grad()
 
@@ -259,6 +259,8 @@ def train(data_dir, model_dir, args):
                 inputs, labels = val_batch
                 inputs = inputs.to(device)
                 labels = labels.to(device)
+                #inputs = torch.stack(list(inputs), dim=0).to(device)
+                #labels = torch.stack(list(labels)).to(device)
 
                 outs = model(inputs)
                 preds = torch.argmax(outs, dim=-1)
