@@ -45,6 +45,10 @@ def inference(data_dir, model_dir, output_dir, args):
     loader = torch.utils.data.DataLoader(
         dataset,
         batch_size=args.batch_size,
+<<<<<<< HEAD
+=======
+        #num_workers=8,
+>>>>>>> origin/main
         shuffle=False,
         pin_memory=use_cuda,
         drop_last=False,
