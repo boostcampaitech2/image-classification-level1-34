@@ -82,8 +82,8 @@ def increment_path(path, exist_ok=False):
         return str(path)
     else:
         dirs = glob.glob(f"{path}*")
-        matches = [re.search(rf"%s(\d+)" % path.stem, d) for d in dirs]
-        i = [int(m.groups()[0]) for m in matches if m]
+        train_acc = [re.search(rf"%s(\d+)" % path.stem, d) for d in dirs]
+        i = [int(m.groups()[0]) for m in train_acc if m]
         n = max(i) + 1 if i else 2
         return f"{path}{n}"
 
@@ -240,10 +240,9 @@ def train(data_dir, model_dir, args):
         for epoch in range(args.epochs):
             # train loop
             model.train()
-            loss_value = 0
-            matches = 0
+            train_loss = 0
+            train_acc = 0
             train_f1 = 0
-            val_f1 = 0
             n_iter = 0
 
             for idx, train_batch in enumerate(train_loader):
@@ -264,11 +263,11 @@ def train(data_dir, model_dir, args):
                 train_f1 += f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
                 n_iter += 1
 
-                loss_value += loss.item()
-                matches += (preds == labels).sum().item()
+                train_loss += loss.item()
+                train_acc += (preds == labels).sum().item()
                 if (idx + 1) % args.log_interval == 0:
-                    train_loss = loss_value / args.log_interval
-                    train_acc = matches / args.batch_size / args.log_interval
+                    train_loss = train_loss / args.log_interval
+                    train_acc = train_acc / args.batch_size / args.log_interval
                     
                     current_lr = get_lr(optimizer)
                     print(
@@ -278,8 +277,8 @@ def train(data_dir, model_dir, args):
                     logger.add_scalar("Train/loss", train_loss, epoch * len(train_loader) + idx)
                     logger.add_scalar("Train/accuracy", train_acc, epoch * len(train_loader) + idx)
 
-                    loss_value = 0
-                    matches = 0
+                    train_loss = 0
+                    train_acc = 0
             
             train_f1 /= n_iter
             wandb.log({
@@ -299,8 +298,10 @@ def train(data_dir, model_dir, args):
             with torch.no_grad():
                 print("Calculating validation results...")
                 model.eval()
-                val_loss_items = []
-                val_acc_items = []
+                val_loss = 0
+                val_acc = 0
+                val_f1 = 0
+                n_iter = 0
                 figure = None
                 for val_batch in val_loader:
                     inputs, labels = val_batch
@@ -312,8 +313,11 @@ def train(data_dir, model_dir, args):
 
                     loss_item = criterion(outs, labels).item()
                     acc_item = (labels == preds).sum().item()
-                    val_loss_items.append(loss_item)
-                    val_acc_items.append(acc_item)
+                    
+                    val_loss += loss_item
+                    val_acc += acc_item
+                    val_f1 += f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
+                    n_iter += 1
 
                     if figure is None:
                         inputs_np = torch.clone(inputs).detach().cpu().permute(0, 2, 3, 1).numpy()
@@ -321,9 +325,10 @@ def train(data_dir, model_dir, args):
                         figure = grid_image(
                             inputs_np, labels, preds, n=16, shuffle=args.dataset != "MaskSplitByProfileDataset"
                         )
-                val_f1 = f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
-                val_loss = np.sum(val_loss_items) / len(val_loader)
-                val_acc = np.sum(val_acc_items) / len(valid_idx) ## 이상함 ㅋㅋㅋㅋㅋ
+
+                val_f1 = val_f1 / n_iter
+                val_loss = val_loss / len(val_loader)
+                val_acc = val_acc / len(valid_idx)
                 best_val_loss = min(best_val_loss, val_loss)
                 if val_acc > best_val_acc or val_f1 > best_val_f1:
                     print(f"New best model for val accuracy or f1 : {val_acc:4.2%}|| {val_f1:4.2%}! saving the best model..")
@@ -366,7 +371,7 @@ if __name__ == '__main__':
 
     # Data and model checkpoints directories
     parser.add_argument('--seed', type=int, default=42, help='random seed (default: 42)')
-    parser.add_argument('--epochs', type=int, default=5, help='number of epochs to train (default: 5)')
+    parser.add_argument('--epochs', type=int, default=30, help='number of epochs to train (default: 30)')
     parser.add_argument('--dataset', type=str, default='MaskSplitByProfileDataset', help='dataset augmentation type (default: MaskSplitByProfileDataset)')
     parser.add_argument('--augmentation', type=str, default='BaseAugmentation', help='data augmentation type (default: BaseAugmentation)')
     parser.add_argument('--sampler', type=bool, default=False, help='use weighted sampler (default: false)')
