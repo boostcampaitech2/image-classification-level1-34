@@ -14,8 +14,8 @@ from torchvision.transforms import *
 from sklearn.model_selection import StratifiedKFold
 from tqdm import tqdm
 
-from albumentations import *
-from albumentations.pytorch import ToTensorV2
+#from albumentations import *
+#from albumentations.pytorch import ToTensorV2
 
 IMG_EXTENSIONS = [
     ".jpg", ".JPG", ".jpeg", ".JPEG", ".png",
@@ -89,7 +89,7 @@ def get_transforms(need=('train', 'val'), img_size=(512, 384), mean=(0.548, 0.50
         ], p=1.0)
     return transformations
 '''
-
+'''
 class CustomAugmentation:
     def __init__(self, img_size=(512, 384), mean=(0.5, 0.5, 0.5), std=(0.2, 0.2, 0.2), **args):
         self.transformations = {}
@@ -109,14 +109,8 @@ class CustomAugmentation:
             ToTensorV2(p=1.0),
         ], p=1.0)
     def __call__(self, image):
-        '''
-        if need=="train":
-            return self.transformations["train"](image)
-        elif need=="val":
-            return self.transformations["val"](image)
-            '''
         return self.transformations
-
+'''
 
 class MaskLabels(int, Enum):
     MASK = 0
@@ -237,8 +231,8 @@ class MaskBaseDataset(Dataset):
         age_label = self.get_age_label(index)
         multi_class_label = self.encode_multi_class(mask_label, gender_label, age_label)
 
-        #image_transform = self.transform(image)
-        image_transform = self.transform(image=np.array(image))['image']
+        image_transform = self.transform(image)
+        #image_transform = self.transform(image=np.array(image))['image']
         return image_transform, multi_class_label
 
     def __len__(self):
