@@ -281,6 +281,15 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
                     id, gender, race, age = profile.split("_")
                     gender_label = GenderLabels.from_str(gender)
                     age_label = AgeLabels.from_number(age)
+                    
+                    if age > 60:
+                        for _ in range(300):
+                            self.image_paths.append(img_path)
+                            self.mask_labels.append(mask_label)
+                            self.gender_labels.append(gender_label)
+                            self.age_labels.append(age_label)
+                            self.indices[phase].append(cnt)
+                            cnt +=1
 
                     self.image_paths.append(img_path)
                     self.mask_labels.append(mask_label)
