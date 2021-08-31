@@ -126,7 +126,7 @@ def train(data_dir, model_dir, args):
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    batch_size = 64
+    batch_size = args.batch_size
     num_workers = 4
 
 
