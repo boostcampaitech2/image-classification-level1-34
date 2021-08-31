@@ -9,9 +9,5 @@ __pycache__
 
 # ignore model saved file and output file
 /Base/model
-<<<<<<< HEAD
-/Base/output
-=======
 /Base/output
 /Base/wandb
->>>>>>> origin/main

@@ -19,7 +19,7 @@ def load_model(saved_model, num_classes, device):
     # tar = tarfile.open(tarpath, 'r:gz')
     # tar.extractall(path=saved_model)
 
-    model_path = os.path.join(saved_model, '27_best.pth')   # need to change
+    model_path = os.path.join(saved_model, '37_best.pth')   # need to change
     model.load_state_dict(torch.load(model_path, map_location=device))
 
     return model
@@ -69,12 +69,12 @@ if __name__ == '__main__':
 
     # Data and model checkpoints directories
     parser.add_argument('--batch_size', type=int, default=1000, help='input batch size for validing (default: 1000)')
-    parser.add_argument('--resize', type=tuple, default=(224, 224), help='resize size for image when you trained (default: (224, 224))')
-    parser.add_argument('--model', type=str, default='myResMLP', help='model type (default: myResMLP)')                                # need to change
+    parser.add_argument('--resize', type=tuple, default=(160, 160), help='resize size for image when you trained (default: (160, 160))')
+    parser.add_argument('--model', type=str, default='myInceptionResnet', help='model type (default: myInceptionResnet)')                                # need to change
 
     # Container environment
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '../Input/data/eval'))
-    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', './model/exp3'))                           # need to change
+    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', './model/exp7'))                           # need to change
     parser.add_argument('--output_dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', './output'))
 
     args = parser.parse_args()
