@@ -198,7 +198,7 @@ def train(data_dir, model_dir, args):
             lr=args.lr,
             weight_decay=5e-4
         )
-        #scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=0)
+        scheduler = CosineAnnealingLR(optimizer, T_max=5, eta_min=0)
 
         # -- logging
         logger = SummaryWriter(log_dir=save_dir)
@@ -209,7 +209,7 @@ def train(data_dir, model_dir, args):
         NUM_EPOCH = args.epochs
         BATCH_SIZE = args.batch_size
         LEARNING_RATE = args.lr
-        #SCHEDULAR = "CosineAnnealingLR"
+        SCHEDULAR = "CosineAnnealingLR"
         AUGMENTATION = args.augmentation
         VAL_SPLIT = args.val_ratio
         DATASET = args.dataset
@@ -219,7 +219,8 @@ def train(data_dir, model_dir, args):
         wandb.login()
         config = {
         'epochs': NUM_EPOCH, 'batch_size': BATCH_SIZE, 'learning_rate': LEARNING_RATE,
-        'val_split': VAL_SPLIT,  'Augmentation': AUGMENTATION, 'Dataset': DATASET, 'Criterion': CRITERION
+        'val_split': VAL_SPLIT,  'Augmentation': AUGMENTATION, 'Dataset': DATASET, 'Criterion': CRITERION, 
+        'schedular': SCHEDULAR
         # Wandb에 남기고 싶은 config log가 있다면 여기에 넣어주시면 됩니다 :)
         }
 
@@ -256,7 +257,7 @@ def train(data_dir, model_dir, args):
 
                 loss.backward()
                 optimizer.step()
-                #scheduler.step()
+                scheduler.step()
 
                 train_loss += loss.item()
                 train_acc += (preds == labels).sum().item()
