@@ -11,6 +11,9 @@ from torch.utils.data import Dataset, Subset, random_split
 from torchvision import transforms
 from torchvision.transforms import *
 
+from sklearn.model_selection import StratifiedKFold
+from tqdm import tqdm
+
 IMG_EXTENSIONS = [
     ".jpg", ".JPG", ".jpeg", ".JPEG", ".png",
     ".PNG", ".ppm", ".PPM", ".bmp", ".BMP",
@@ -233,6 +236,17 @@ class MaskBaseDataset(Dataset):
         n_val = int(len(self) * self.val_ratio)
         n_train = len(self) - n_val
         train_set, val_set = random_split(self, [n_train, n_val])
+        return train_set, val_set
+
+    def split_dataset_kfold(self) -> Tuple[Subset, Subset]:
+        skf = StratifiedKFold(n_splits=5)
+        X = []
+        y = []
+        for idx in tqdm(range(len(self))):
+            X_, y_ = self[idx]
+            X.append(X_)
+            y.append(y_)
+        train_set, val_set = skf.split(np.array(X), np.array(y))
         return train_set, val_set
 
 

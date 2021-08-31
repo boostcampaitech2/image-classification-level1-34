@@ -114,7 +114,8 @@ def train(data_dir, model_dir, args):
     dataset.set_transform(transform)
 
     # -- data_loader
-    train_set, val_set = dataset.split_dataset()
+    #train_set, val_set = dataset.split_dataset()
+    train_set, val_set = dataset.split_dataset_kfold()
 
     train_loader = DataLoader(
         train_set,
@@ -163,7 +164,7 @@ def train(data_dir, model_dir, args):
     SCHEDULAR = 'CosineAnnealingLR'
     AUGMENTATION = args.augmentation
     VAL_SPLIT = args.val_ratio
-
+    
     # -- wandb
     wandb.login()
     config = {
@@ -178,7 +179,7 @@ def train(data_dir, model_dir, args):
     wandb.run.name = args.wandb_name 
 
     wandb.watch(model)
-
+    
     best_val_acc = 0
     best_val_loss = np.inf
     for epoch in range(args.epochs):
@@ -223,14 +224,14 @@ def train(data_dir, model_dir, args):
 
                 loss_value = 0
                 matches = 0
-
+        
         train_f1 /= n_iter
         wandb.log({
                     "train loss": train_loss,
                     "train acc" : train_acc,
                     "train f1": train_f1,
                 })
-                
+        
 
         # 각 에폭의 마지막 input 이미지로 grid view 생성
         img_grid = torchvision.utils.make_grid(inputs)
@@ -283,7 +284,7 @@ def train(data_dir, model_dir, args):
             logger.add_scalar("Val/accuracy", val_acc, epoch)
             logger.add_figure("results", figure, epoch)
             print()
-
+            
             # wandb 검증 단계에서 Loss, Accuracy 로그 저장
             wandb.log({
                 "validation loss": val_loss,
@@ -292,6 +293,7 @@ def train(data_dir, model_dir, args):
             })
 
     wandb.finish()
+    
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -303,7 +305,7 @@ if __name__ == '__main__':
     # Data and model checkpoints directories
     parser.add_argument('--seed', type=int, default=42, help='random seed (default: 42)')
     parser.add_argument('--epochs', type=int, default=20, help='number of epochs to train (default: 5)')
-    parser.add_argument('--dataset', type=str, default='MaskSplitByProfileDataset', help='dataset augmentation type (default: MaskBaseDataset)')
+    parser.add_argument('--dataset', type=str, default='MaskBaseDataset', help='dataset augmentation type (default: MaskBaseDataset)')
     parser.add_argument('--augmentation', type=str, default='BaseAugmentation', help='data augmentation type (default: BaseAugmentation)')
     parser.add_argument("--resize", nargs="+", type=list, default=[128, 96], help='resize size for image when training')
     parser.add_argument('--batch_size', type=int, default=64, help='input batch size for training (default: 64)')
