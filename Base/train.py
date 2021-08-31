@@ -114,8 +114,8 @@ def train(data_dir, model_dir, args):
     dataset.set_transform(transform)
 
     # -- data_loader
-    #train_set, val_set = dataset.split_dataset()
-    train_set, val_set = dataset.split_dataset_kfold()
+    train_set, val_set = dataset.split_dataset()
+    #train_set, val_set = dataset.split_dataset_kfold()
 
     train_loader = DataLoader(
         train_set,
@@ -161,15 +161,16 @@ def train(data_dir, model_dir, args):
     NUM_EPOCH = args.epochs
     BATCH_SIZE = args.batch_size
     LEARNING_RATE = args.lr
-    SCHEDULAR = 'CosineAnnealingLR'
+    SCHEDULAR = "CosineAnnealingLR"
     AUGMENTATION = args.augmentation
     VAL_SPLIT = args.val_ratio
+    DATASET = args.dataset
     
     # -- wandb
     wandb.login()
     config = {
     'epochs': NUM_EPOCH, 'batch_size': BATCH_SIZE, 'learning_rate': LEARNING_RATE,
-    'val_split': VAL_SPLIT, 'Schedular': SCHEDULAR,  'Augmentation': AUGMENTATION
+    'val_split': VAL_SPLIT, 'Schedular': SCHEDULAR,  'Augmentation': AUGMENTATION, 'Dataset': DATASET
     }
 
     wandb.init(project='image-classification-mask', 
@@ -241,6 +242,12 @@ def train(data_dir, model_dir, args):
 
         scheduler.step()
 
+        classes = [str(num) for num in range(18)]
+
+        correct_pred = {classname: 0 for classname in classes}
+        total_pred = {classname: 0 for classname in classes}         
+
+
         # val loop
         with torch.no_grad():
             print("Calculating validation results...")
@@ -267,6 +274,12 @@ def train(data_dir, model_dir, args):
                     figure = grid_image(
                         inputs_np, labels, preds, n=16, shuffle=args.dataset != "MaskSplitByProfileDataset"
                     )
+
+                for label, prediction in zip(labels, preds):
+                    if label == prediction:
+                        correct_pred[classes[label]] += 1
+                    total_pred[classes[label]] += 1
+
             val_f1 = f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
             val_loss = np.sum(val_loss_items) / len(val_loader)
             val_acc = np.sum(val_acc_items) / len(val_set)
@@ -285,7 +298,7 @@ def train(data_dir, model_dir, args):
             logger.add_figure("results", figure, epoch)
             print()
             
-            # wandb 검증 단계에서 Loss, Accuracy 로그 저장
+            # wandb 검증 단계에서 Loss, Accuracy 로그 저P장
             wandb.log({
                 "validation loss": val_loss,
                 "validation acc" : val_acc, 
@@ -293,6 +306,13 @@ def train(data_dir, model_dir, args):
             })
 
     wandb.finish()
+
+
+    # print accuracy for each class
+    for classname, correct_count in correct_pred.items():
+        accuracy = 100 * float(correct_count) / total_pred[classname]
+        print("Accuracy for class {:5s} is: {:.1f} %".format(classname,
+                                                    accuracy))
     
 
 if __name__ == '__main__':
@@ -305,7 +325,7 @@ if __name__ == '__main__':
     # Data and model checkpoints directories
     parser.add_argument('--seed', type=int, default=42, help='random seed (default: 42)')
     parser.add_argument('--epochs', type=int, default=20, help='number of epochs to train (default: 5)')
-    parser.add_argument('--dataset', type=str, default='MaskBaseDataset', help='dataset augmentation type (default: MaskBaseDataset)')
+    parser.add_argument('--dataset', type=str, default='MaskSplitByProfileDataset', help='dataset augmentation type (default: MaskBaseDataset)')
     parser.add_argument('--augmentation', type=str, default='BaseAugmentation', help='data augmentation type (default: BaseAugmentation)')
     parser.add_argument("--resize", nargs="+", type=list, default=[128, 96], help='resize size for image when training')
     parser.add_argument('--batch_size', type=int, default=64, help='input batch size for training (default: 64)')

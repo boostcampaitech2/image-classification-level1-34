@@ -103,7 +103,7 @@ class AgeLabels(int, Enum):
 
         if value < 30:
             return cls.YOUNG
-        elif value < 60:
+        elif value < 57:
             return cls.MIDDLE
         else:
             return cls.OLD
@@ -238,16 +238,20 @@ class MaskBaseDataset(Dataset):
         train_set, val_set = random_split(self, [n_train, n_val])
         return train_set, val_set
 
+    '''
     def split_dataset_kfold(self) -> Tuple[Subset, Subset]:
         skf = StratifiedKFold(n_splits=5)
-        X = []
+        X = self.image_paths[:40]
         y = []
-        for idx in tqdm(range(len(self))):
-            X_, y_ = self[idx]
-            X.append(X_)
+        for idx in tqdm(range(40)):
+            y_ = self[idx][1]
+            print(y_)
             y.append(y_)
-        train_set, val_set = skf.split(np.array(X), np.array(y))
+        # 에러 발생 - ValueError: only one element tensors can be converted to Python scalars
+        # train_set, val_set = skf.split(np.array(X), np.array(y))
+        train_set, val_set = skf.split(X, y)
         return train_set, val_set
+    '''
 
 
 class MaskSplitByProfileDataset(MaskBaseDataset):
