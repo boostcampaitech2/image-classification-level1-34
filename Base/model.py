@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import torchvision
 import math
 from facenet_pytorch import MTCNN, InceptionResnetV1
-
+import timm
 
 class BaseModel(nn.Module):
     def __init__(self, num_classes):
@@ -64,6 +64,16 @@ class FaceNet(nn.Module):
         stdv = 1. / math.sqrt(self.net.logits.weight.size(1))
         self.net.logits.bias.data.uniform_(-stdv, stdv)
 
+    def forward(self, x):
+        x = self.net(x)
+        return x
+
+
+class Resnext50(nn.Module):
+    def __init__(self, num_classes):
+        super().__init__()
+        self.net = timm.create_model('resnext50_32x4d', pretrained=True, num_classes= num_classes)
+    
     def forward(self, x):
         x = self.net(x)
         return x
