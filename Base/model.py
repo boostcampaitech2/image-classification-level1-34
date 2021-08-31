@@ -54,16 +54,31 @@ class MyModel(nn.Module):
 # ResMLP model
 from res_mlp_pytorch import ResMLP
 
-class myResMLP(nn.Module):
+class myResMLP(nn.Module): # 224,224
     def __init__(self, num_classes):
         super().__init__()
         self.model = ResMLP(
             image_size = (224, 224),
-            patch_size = 14,
-            dim = 256,
-            depth = 8,
+            patch_size = 16,
+            dim = 384,
+            depth = 12,
             num_classes = num_classes
         )
+
+    def forward(self, x):
+        x = self.model(x)
+        return x
+
+# Inception Resnet model
+from facenet_pytorch import InceptionResnetV1
+
+class myInceptionResnet(nn.Module): # 160, 160
+    def __init__(self, num_classes):
+        super().__init__()
+        self.model = InceptionResnetV1(
+            pretrained='vggface2',
+            num_classes = num_classes
+            )
 
     def forward(self, x):
         x = self.model(x)
