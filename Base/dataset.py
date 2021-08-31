@@ -11,6 +11,12 @@ from torch.utils.data import Dataset, Subset, random_split
 from torchvision import transforms
 from torchvision.transforms import *
 
+from sklearn.model_selection import StratifiedKFold
+from tqdm import tqdm
+
+#from albumentations import *
+#from albumentations.pytorch import ToTensorV2
+
 IMG_EXTENSIONS = [
     ".jpg", ".JPG", ".jpeg", ".JPEG", ".png",
     ".PNG", ".ppm", ".PPM", ".bmp", ".BMP",
@@ -50,40 +56,8 @@ class AddGaussianNoise(object):
         return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
 
 
-class CustomAugmentation:
-    def __init__(self, resize, mean, std, **args):
-        self.transform = transforms.Compose([
-            CenterCrop((320, 256)),
-            Resize(resize, Image.BILINEAR),
-            ColorJitter(0.1, 0.1, 0.1, 0.1),
-            ToTensor(),
-            Normalize(mean=mean, std=std),
-            AddGaussianNoise()
-        ])
 
-    def __call__(self, image):
-        return self.transform(image)
 
-# class CustomAugmentation:
-#     def __init__(self, resize, mean, std, **args):
-#         self.transform1 = transforms.Compose(
-#             [CenterCrop((320, 256))]
-#             )
-#         self.transform2 = transforms.Compose([
-#             Resize(resize, Image.BILINEAR),
-#             ColorJitter(0.1, 0.1, 0.1, 0.1),
-#             ToTensor(),
-#             Normalize(mean=mean, std=std),
-#             AddGaussianNoise()
-#         ])
-#     def __call__(self, image):
-#         if sum(image.size) == 400:
-#             print(image.size)
-#             pass
-#         else:
-#             image = self.transform1(image)
-#         image = self.transform2(image)
-#         return image
 
 class MaskLabels(int, Enum):
     MASK = 0
@@ -120,7 +94,7 @@ class AgeLabels(int, Enum):
 
         if value < 30:
             return cls.YOUNG
-        elif value < 60:
+        elif value < 57:
             return cls.MIDDLE
         else:
             return cls.OLD
@@ -205,6 +179,7 @@ class MaskBaseDataset(Dataset):
         multi_class_label = self.encode_multi_class(mask_label, gender_label, age_label)
 
         image_transform = self.transform(image)
+        #image_transform = self.transform(image=np.array(image))['image']
         return image_transform, multi_class_label
 
     def __len__(self):
@@ -254,6 +229,8 @@ class MaskBaseDataset(Dataset):
         n_train = len(self) - n_val
         train_set, val_set = random_split(self, [n_train, n_val])
         return train_set, val_set
+
+   
 
 
 class MaskSplitByProfileDataset(MaskBaseDataset):
@@ -341,6 +318,18 @@ class TestDataset(Dataset):
 
     def __len__(self):
         return len(self.img_paths)
+
+
+class AdditionalAugmetation:
+    def __init__(self, resize, mean, std, **args):
+        self.transform = transforms.Compose([
+            Resize(resize, Image.BILINEAR),
+            ToTensor(),
+            Normalize(mean=mean, std=std),
+        ])
+
+    def __call__(self, image):
+        return self.transform(image)
 
 
 class AdditionalDataset(Dataset):
@@ -496,11 +485,11 @@ class AdditionalDataset(Dataset):
         return train_set, val_set
 
 
-if __name__ == "__main__":
-    A = AdditionalDataset('/opt/ml/input/data/train/images')
-    print(A.image_paths[-1])
-    A.set_transform(ToTensor())
-    img, label = A[len(A.image_paths)-1]
-    print(img, label)
+# if __name__ == "__main__":
+#     A = AdditionalDataset('/opt/ml/input/data/train/images')
+#     print(A.image_paths[-1])
+#     A.set_transform(ToTensor())
+#     img, label = A[len(A.image_paths)-1]
+#     print(img, label)
     
     
