@@ -221,7 +221,7 @@ def train(data_dir, model_dir, args):
         # -- wandb
         wandb.login()
         config = {
-        'epochs': NUM_EPOCH, 'batch_size': BATCH_SIZE, 'learning_rate': LEARNING_RATE, 'Schedular': SCHEDULAR, 'Criterion': CREITERION
+        'epochs': NUM_EPOCH, 'batch_size': BATCH_SIZE, 'learning_rate': LEARNING_RATE, 'Schedular': SCHEDULAR, 'Criterion': CREITERION,
         'val_split': VAL_SPLIT,  'Augmentation': AUGMENTATION, 'Dataset': DATASET, 'cutmix.beta': BETA, 'cutmix.prob': PROB
         }
 
