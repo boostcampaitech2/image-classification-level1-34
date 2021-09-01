@@ -41,7 +41,6 @@ class BaseAugmentation:
 class CustomAugmentation:
     def __init__(self, resize, mean, std, **args):
         self.transform = transforms.Compose([
-            CenterCrop((256, 256)),
             Resize(resize, Image.BILINEAR),
             ToTensor(),
             Normalize(mean=mean, std=std),
@@ -146,8 +145,9 @@ class GenderLabels(int, Enum):
 
 class AgeLabels(int, Enum):
     YOUNG = 0
-    MIDDLE = 1
-    OLD = 2
+    MIDDLE1 = 1 
+    MIDDLE2 = 2   ### edit point
+    OLD = 3
 
     @classmethod
     def from_number(cls, value: str) -> int:
@@ -158,8 +158,10 @@ class AgeLabels(int, Enum):
 
         if value < 30:
             return cls.YOUNG
-        elif value < 60:  # default 60
-            return cls.MIDDLE
+        elif value < 45:  # default 60
+            return cls.MIDDLE1
+        elif value < 60:  # default 60   ### edit point
+            return cls.MIDDLE2
         else:
             return cls.OLD
 
@@ -182,7 +184,7 @@ class MaskBaseDataset(Dataset):
     gender_labels = []
     age_labels = []
 
-    def __init__(self, data_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
+    def __init__(self, data_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2, label="label"):
         self.data_dir = data_dir
         self.mean = mean
         self.std = std
@@ -191,6 +193,15 @@ class MaskBaseDataset(Dataset):
         self.transform = None
         self.setup()
         self.calc_statistics()
+        self.label = label
+        if self.label == "age":
+            self.num_classes = 4   ### edit point
+        elif self.label == "gender":
+            self.num_classes = 2
+        elif self.label == "state":
+            self.num_classes = 3
+        else:
+            self.num_classes = 18
 
     def setup(self):
         profiles = os.listdir(self.data_dir)
@@ -241,10 +252,19 @@ class MaskBaseDataset(Dataset):
         gender_label = self.get_gender_label(index)
         age_label = self.get_age_label(index)
         multi_class_label = self.encode_multi_class(mask_label, gender_label, age_label)
+        
+        if self.label == "age":
+            ret_label = age_label
+        elif self.label == "gender":
+            ret_label = gender_label
+        elif self.label == "state":
+            ret_label = mask_label
+        else:
+            ret_label = multi_class_label
 
         image_transform = self.transform(image)
         #image_transform = self.transform(image=np.array(image))['image']
-        return image_transform, multi_class_label
+        return image_transform, ret_label
 
     def __len__(self):
         return len(self.image_paths)
@@ -260,7 +280,10 @@ class MaskBaseDataset(Dataset):
 
     def read_image(self, index):
         image_path = self.image_paths[index]
-        return Image.open(image_path)
+        img = Image.open(image_path)
+        if img.mode == "RGBA":
+            img = img.convert('RGB')
+        return img
 
     @staticmethod
     def encode_multi_class(mask_label, gender_label, age_label) -> int:
@@ -318,9 +341,9 @@ class MaskSplitByProfileDataset(MaskBaseDataset):
         이후 `split_dataset` 에서 index 에 맞게 Subset 으로 dataset 을 분기합니다.
     """
 
-    def __init__(self, data_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2):
+    def __init__(self, data_dir, mean=(0.548, 0.504, 0.479), std=(0.237, 0.247, 0.246), val_ratio=0.2, label ="label"):
         self.indices = defaultdict(list)
-        super().__init__(data_dir, mean, std, val_ratio)
+        super().__init__(data_dir, mean, std, val_ratio, label)
 
     @staticmethod
     def _split_profile(profiles, val_ratio):
