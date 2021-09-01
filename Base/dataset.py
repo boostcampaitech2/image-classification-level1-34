@@ -14,8 +14,8 @@ from torchvision.transforms import *
 from sklearn.model_selection import StratifiedKFold
 from tqdm import tqdm
 
-#from albumentations import *
-#from albumentations.pytorch import ToTensorV2
+# from albumentations import *
+# from albumentations.pytorch import ToTensorV2
 
 IMG_EXTENSIONS = [
     ".jpg", ".JPG", ".jpeg", ".JPEG", ".png",
@@ -189,9 +189,6 @@ class MaskBaseDataset(Dataset):
         else:
             self.num_classes = 18
 
-
-
-
     def setup(self):
         profiles = os.listdir(self.data_dir)
         for profile in profiles:
@@ -269,7 +266,10 @@ class MaskBaseDataset(Dataset):
 
     def read_image(self, index):
         image_path = self.image_paths[index]
-        return Image.open(image_path)
+        img = Image.open(image_path)
+        if img.mode == "RGBA":
+            img = img.convert('RGB')
+        return img
 
     @staticmethod
     def encode_multi_class(mask_label, gender_label, age_label) -> int:
