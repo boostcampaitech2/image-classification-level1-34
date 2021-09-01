@@ -246,7 +246,7 @@ def train(data_dir, model_dir, args):
         wandb.init(project='image-classification-mask', 
                 entity='team-34', 
                 config=config
-                ) 
+                )  
         wandb.run.name = args.wandb_name + str(fold)
 
         wandb.watch(model)
@@ -359,7 +359,7 @@ def train(data_dir, model_dir, args):
                         figure = grid_image(
                             inputs_np, labels, preds, n=16, shuffle=args.dataset != "MaskSplitByProfileDataset"
                         )
-
+                df[f"epoch_{epoch}_path"] = path_list
                 df[f"epoch_{epoch}_pred"] = pred_list
                 df[f"epoch_{epoch}_label"] = labels_list
 
