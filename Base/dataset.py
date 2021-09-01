@@ -4,6 +4,7 @@ from collections import defaultdict
 from enum import Enum
 from typing import Tuple, List
 from albumentations.augmentations.transforms import GridDistortion
+import cv2
 
 import numpy as np
 import torch
@@ -253,29 +254,52 @@ class MaskBaseDataset(Dataset):
     def __getitem__(self, index):
         assert self.transform is not None, ".set_tranform 메소드를 이용하여 transform 을 주입해주세요"
 
-        image = self.read_image(index)
+        # image = self.read_image(index)
         mask_label = self.get_mask_label(index)
         gender_label = self.get_gender_label(index)
         age_label = self.get_age_label(index)
         multi_class_label = self.encode_multi_class(mask_label, gender_label, age_label)
 
+        # image_transform = self.transform(image)
+
+        image = cv2.imread(self.image_paths[index])
+        rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        face = cascade.detectMultiScale(rgb)
+        if len(face) == 0:
+            croped = rgb[100:400, 80:280]
+        else:
+            for x, y, w, h in face:
+                if w < 100:
+                    croped = rgb[100:400, 80:280]
+                    break
+                croped = rgb[max(0,y-50):min(y+h+20, 512), x:x+w]
+        
+        crop_img = Image.fromarray(croped)
+        crop_img = transforms.Resize((224,224))(crop_img)
+        
+        image_transform = self.transform(crop_img)
+        image_transform = torch.tensor(image_transform, dtype=torch.float)
+
+        return image_transform, multi_class_label
+
         #image_transform = self.transform(image)
         #image_transform = self.transform(image=np.array(image))['image']
 
-        albumentations_transform = A.Compose([
-                GridDistortion(p=1.0),
-                A.HorizontalFlip(p=0.5),
-                A.GaussNoise(p=0.5),
-                ToTensorV2(p=1.0),
-        ], p=1.0)
+        # albumentations_transform = A.Compose([
+        #         GridDistortion(p=1.0),
+        #         A.HorizontalFlip(p=0.5),
+        #         A.GaussNoise(p=0.5),
+        #         ToTensorV2(p=1.0),
+        # ], p=1.0)
 
-        augmented = albumentations_transform(image=np.array(image))
-        image_transform = augmented['image']
-
-        # augmented = albumentations_transform(image=image)
+        # augmented = albumentations_transform(image=np.array(image))
         # image_transform = augmented['image']
+
+        # # augmented = albumentations_transform(image=image)
+        # # image_transform = augmented['image']
         
-        return image_transform.float(), multi_class_label
+        # return image_transform.float(), multi_class_label
 
     def __len__(self):
         return len(self.image_paths)

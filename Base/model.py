@@ -41,16 +41,15 @@ class BaseModel(nn.Module):
 class ResNet18(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
-        self.net = torchvision.models.resnet18(pretrained=True)
-
-        self.net.fc = torch.nn.Linear(in_features=512, out_features=num_classes, bias=True)
-
-        torch.nn.init.xavier_uniform_(self.net.fc.weight)
-        stdv = 1. / math.sqrt(self.net.fc.weight.size(1))
-        self.net.fc.bias.data.uniform_(-stdv, stdv)
+        self.model = torchvision.models.resnet18(pretrained=True)
+        #self.net.fc = torch.nn.Linear(in_features=512, out_features=num_classes, bias=True)
+        self.model.fc = nn.Linear(in_features=self.model.fc.weight.size(1), out_features=num_classes, bias= True)
+        torch.nn.init.xavier_uniform_(self.model.fc.weight)
+        stdv = 1. / math.sqrt(self.model.fc.weight.size(1))
+        self.model.fc.bias.data.uniform_(-stdv, stdv)
 
     def forward(self, x):
-        x = self.net(x)
+        x = self.model(x)
         return x
 
 
