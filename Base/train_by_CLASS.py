@@ -139,13 +139,14 @@ def rand_bbox(size, lam): # size : [Batch_size, Channel, Width, Height]
     """
     W = size[2] 
     H = size[3] 
-    cut_rat = np.sqrt(1. - lam)  # 패치 크기 비율
+    cut_rat = np.sqrt(1. - lam)/1.5  # 패치 크기 비율
     cut_w = np.int(W * cut_rat)
     cut_h = np.int(H * cut_rat)  
 
    	# 패치의 중앙 좌표 값 cx, cy
-    cx = np.random.randint(W*0.4)
-    cy = np.random.randint(H*0.4, H*0.8) 
+    cx = np.random.randint(W*0.7, W)
+    cy = np.random.randint(H*0.3, H*0.7) 
+    
 
     # 패치 모서리 좌표 값 
     bbx1 = np.clip(cx - cut_w // 2, 0, W)
@@ -235,12 +236,13 @@ def train(data_dir, model_dir, args):
         BETA = args.beta
         PROB = args.cutmix_prob
         LABEL = args.label
+        NAME = args.wandb_name
         
         # -- wandb
         wandb.login()
         config = {
         'epochs': NUM_EPOCH, 'batch_size': BATCH_SIZE, 'learning_rate': LEARNING_RATE, 'Schedular': SCHEDULAR, 'Criterion': CREITERION,
-        'val_split': VAL_SPLIT,  'Augmentation': AUGMENTATION, 'Dataset': DATASET, 'cutmix.beta': BETA, 'cutmix.prob': PROB, 'Label': LABEL,
+        'val_split': VAL_SPLIT,  'Augmentation': AUGMENTATION, 'Dataset': DATASET, 'cutmix.beta': BETA, 'cutmix.prob': PROB, 'Label': LABEL, 'exp': NAME
         }
 
         wandb.init(project='image-classification-mask', 
@@ -264,23 +266,22 @@ def train(data_dir, model_dir, args):
             train_f1 = 0
 
             for idx, train_batch in enumerate(train_loader):
-                inputs, labels, path = train_batch
+                inputs, labels, path, state = train_batch
                 inputs = inputs.to(device)
                 labels = labels.to(device)
 
                 optimizer.zero_grad()
 
                 r = np.random.rand(1)
+       
                 if args.beta > 0 and  r < args.cutmix_prob:     
                     lam = np.random.beta(args.beta, args.beta)
-                    rand_index = torch.randperm(inputs.size()[0]).to(device)
                     target_a = labels 
-                    target_b = labels[rand_index]        
                     bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam)
-                    inputs[:, :, bbx1:bbx2, bby1:bby2] = inputs[rand_index, :, bbx1:bbx2, bby1:bby2]
+                    inputs[:, :, bbx1:bbx2, bby1:bby2] = 0
                     lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
                     outs = model(inputs)
-                    loss = criterion(outs, target_a) * lam + criterion(outs, target_b) * (1. - lam)  
+                    loss = criterion(outs, target_a) 
                 
                 else:
                     outs = model(inputs)
@@ -338,7 +339,7 @@ def train(data_dir, model_dir, args):
                 path_list = []
                 for idx, val_batch in  enumerate(val_loader):
 
-                    inputs, labels, path = val_batch
+                    inputs, labels, path, state = val_batch
                     inputs = inputs.to(device)
                     labels = labels.to(device)
 
@@ -384,8 +385,8 @@ def train(data_dir, model_dir, args):
                     best_val_f1 = val_f1
 
                 print(
-                    f"[Val] acc : {val_acc:4.2%}, loss: {val_loss:4.2} || "
-                    f"best f1 : {best_val_f1:4.2%},best acc : {best_val_acc:4.2%}, best loss: {best_val_loss:4.2}"
+                    f"[Val] acc : {val_acc:4.2%}, f1 : {val_f1:4.2%}, loss: {val_loss:4.2} || "
+                    f"best f1 : {best_val_f1:4.2%}, best acc : {best_val_acc:4.2%}, best loss: {best_val_loss:4.2}"
                 )
 
                 print("Print Validaition Confusion Matrix..")
@@ -428,7 +429,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, default='MaskSplitByProfileDataset', help='dataset augmentation type (default: MaskSplitByProfileDataset)')
     parser.add_argument('--augmentation', type=str, default='CustomAugmentation', help='data augmentation type (default: CustomAugmentation)')
     parser.add_argument("--resize", nargs="+", type=list, default=[224, 224], help='resize size for image when training')
-    parser.add_argument('--batch_size', type=int, default=64, help='input batch size for training (default: 64)')
+    parser.add_argument('--batch_size', type=int, default=128, help='input batch size for training (default: 64)')
     parser.add_argument('--valid_batch_size', type=int, default=1000, help='input batch size for validing (default: 1000)')
     parser.add_argument('--model', type=str, default='ResNet18', help='model type (default: ResNet18)')
     parser.add_argument('--optimizer', type=str, default='AdamW', help='optimizer type (default: AdamW)')

@@ -265,7 +265,7 @@ class MaskBaseDataset(Dataset):
 
         image_transform = self.transform(image)
         #image_transform = self.transform(image=np.array(image))['image']
-        return image_transform, ret_label, path
+        return image_transform, ret_label, path, mask_label
 
     def __len__(self):
         return len(self.image_paths)
