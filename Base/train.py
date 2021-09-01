@@ -11,7 +11,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
+from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR, CosineAnnealingWarmRestarts
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
@@ -86,28 +86,6 @@ def increment_path(path, exist_ok=False):
         i = [int(m.groups()[0]) for m in matches if m]
         n = max(i) + 1 if i else 2
         return f"{path}{n}"
-"""
-cut_mix function
-"""
-def rand_bbox(size, lam): # size : [Batch_size, Channel, Width, Height]
-    W = size[2] 
-    H = size[3] 
-    cut_rat = np.sqrt(1. - lam)  # 패치 크기 비율
-    cut_w = np.int(W * cut_rat)
-    cut_h = np.int(H * cut_rat)  
-
-   	# 패치의 중앙 좌표 값 cx, cy
-    cx = np.random.randint(W)
-    cy = np.random.randint(H)
-		
-    # 패치 모서리 좌표 값 
-    bbx1 = np.clip(cx - cut_w // 2, 0, W)
-    bby1 = np.clip(cy - cut_h // 2, 0, H)
-    bbx2 = np.clip(cx + cut_w // 2, 0, W)
-    bby2 = np.clip(cy + cut_h // 2, 0, H)
-   
-    return bbx1, bby1, bbx2, bby2
-
 
 def getDataloader(dataset, train_idx, valid_idx, batch_size, num_workers):
     # 인자로 전달받은 dataset에서 train_idx에 해당하는 Subset 추출
@@ -137,6 +115,33 @@ def getDataloader(dataset, train_idx, valid_idx, batch_size, num_workers):
     # 생성한 DataLoader 반환
     return train_loader, val_loader
 
+def rand_bbox(size, lam): # size : [Batch_size, Channel, Width, Height]
+    """
+
+    cut_mix function
+
+    """
+    W = size[2] 
+    H = size[3] 
+    cut_rat = np.sqrt(1. - lam)  # 패치 크기 비율
+    cut_w = np.int(W * cut_rat)
+    cut_h = np.int(H * cut_rat)  
+
+   	# 패치의 중앙 좌표 값 cx, cy
+    cx = np.random.randint(W)
+    cy = np.random.randint(H) 
+
+    # 마스크 위로 비교하기 위해 y 기준을 높임
+    cy = cy * 1.5 
+
+    # 패치 모서리 좌표 값 
+    bbx1 = np.clip(cx - cut_w // 2, 0, W)
+    bby1 = np.clip(cy - cut_h // 2, 0, H)
+    bbx2 = np.clip(cx + cut_w // 2, 0, W)
+    bby2 = np.clip(cy + cut_h // 2, 0, H)
+   
+    return bbx1, bby1, bbx2, bby2
+
 
 def train(data_dir, model_dir, args):
 
@@ -148,7 +153,7 @@ def train(data_dir, model_dir, args):
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    batch_size = 64
+    batch_size = args.batch_size
     num_workers = 4
 
 
@@ -197,7 +202,7 @@ def train(data_dir, model_dir, args):
         )
         """
         optimizer = optim.AdamW(model.parameters(),lr=1e-3)
-        #scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=0)
+        scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=5, T_mult=2, eta_min=0.001)
 
         # -- logging
         logger = SummaryWriter(log_dir=save_dir)
@@ -208,16 +213,18 @@ def train(data_dir, model_dir, args):
         NUM_EPOCH = args.epochs
         BATCH_SIZE = args.batch_size
         LEARNING_RATE = args.lr
-        #SCHEDULAR = "CosineAnnealingLR"
+        SCHEDULAR = "CosineAnnealingWarm"
         AUGMENTATION = args.augmentation
         VAL_SPLIT = args.val_ratio
         DATASET = args.dataset
+        BETA = args.beta
+        PROB = args.cutmix_prob
         
         # -- wandb
         wandb.login()
         config = {
-        'epochs': NUM_EPOCH, 'batch_size': BATCH_SIZE, 'learning_rate': LEARNING_RATE,
-        'val_split': VAL_SPLIT,  'Augmentation': AUGMENTATION, 'Dataset': DATASET
+        'epochs': NUM_EPOCH, 'batch_size': BATCH_SIZE, 'learning_rate': LEARNING_RATE, 'shedular': SCHEDULAR,
+        'val_split': VAL_SPLIT,  'Augmentation': AUGMENTATION, 'Dataset': DATASET, 'cutmix.beta': BETA, 'cutmix.prob': PROB
         }
 
         wandb.init(project='image-classification-mask', 
@@ -335,7 +342,7 @@ def train(data_dir, model_dir, args):
                 best_val_loss = min(best_val_loss, val_loss)
                 if val_acc > best_val_acc or val_f1 > best_val_f1:
                     print(f"New best model for val accuracy or f1 : {val_acc:4.2%}|| {val_f1:4.2%}! saving the best model..")
-                    torch.save(model.module.state_dict(), f"{save_dir}/{args.model}_{fold}_{epoch}_accuracy_{val_acc:4.2%}_f1_{val_f1:4.2%}.pth")
+                    torch.save(model.module.state_dict(), f"{save_dir}/{fold}_{epoch}_accuracy_{val_acc:4.2%}_f1_{val_f1:4.2%}.pth")
                     best_val_acc = val_acc
                     best_val_f1 = val_f1
                 print(
@@ -355,6 +362,7 @@ def train(data_dir, model_dir, args):
                 })
 
         wandb.finish()
+
     '''
     # print accuracy for each class
     for classname, correct_count in correct_pred.items():
@@ -362,7 +370,6 @@ def train(data_dir, model_dir, args):
         print("Accuracy for class {:5s} is: {:.1f} %".format(classname,
                                                     accuracy))
                                                     '''
-    
 
 
 if __name__ == '__main__':
@@ -376,15 +383,15 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=42, help='random seed (default: 42)')
     parser.add_argument('--epochs', type=int, default=30, help='number of epochs to train (default: 30)')
     parser.add_argument('--dataset', type=str, default='MaskSplitByProfileDataset', help='dataset augmentation type (default: MaskSplitByProfileDataset)')
-    parser.add_argument('--augmentation', type=str, default='BaseAugmentation', help='data augmentation type (default: BaseAugmentation)')
-    parser.add_argument("--resize", nargs="+", type=list, default=[128, 96], help='resize size for image when training')
+    parser.add_argument('--augmentation', type=str, default='CustomAugmentation', help='data augmentation type (default: CustomAugmentation)')
+    parser.add_argument("--resize", nargs="+", type=list, default=[224, 224], help='resize size for image when training')
     parser.add_argument('--batch_size', type=int, default=64, help='input batch size for training (default: 64)')
     parser.add_argument('--valid_batch_size', type=int, default=1000, help='input batch size for validing (default: 1000)')
     parser.add_argument('--model', type=str, default='ResNet18', help='model type (default: ResNet18)')
     parser.add_argument('--optimizer', type=str, default='AdamW', help='optimizer type (default: AdamW)')
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate (default: 1e-3)')
     parser.add_argument('--val_ratio', type=float, default=0.2, help='ratio for validaton (default: 0.2)')
-    parser.add_argument('--criterion', type=str, default='cross_entropy', help='criterion type (default: cross_entropy)')
+    parser.add_argument('--criterion', type=str, default='focal', help='criterion type (default: focal)')
     parser.add_argument('--lr_decay_step', type=int, default=20, help='learning rate scheduler deacy step (default: 20)')
     parser.add_argument('--log_interval', type=int, default=20, help='how many batches to wait before logging training status')
     parser.add_argument('--name', default='exp', help='model save at {SM_MODEL_DIR}/{name}')
@@ -394,8 +401,8 @@ if __name__ == '__main__':
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR', './model'))
 
     # cutmix setting
-    parser.add_argument('--beta', default=0.1, type=float, help='hyperparameter beta')
-    parser.add_argument('--cutmix_prob', default=0, type=float, help='cutmix probability')
+    parser.add_argument('--beta', default=0.2, type=float, help='hyperparameter beta')
+    parser.add_argument('--cutmix_prob', default=0.6, type=float, help='cutmix probability')
 
     args = parser.parse_args()
     print(args)

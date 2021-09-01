@@ -38,6 +38,17 @@ class BaseAugmentation:
     def __call__(self, image):
         return self.transform(image)
 
+class CustomAugmentation:
+    def __init__(self, resize, mean, std, **args):
+        self.transform = transforms.Compose([
+            CenterCrop((256, 142)),
+            Resize(resize, Image.BILINEAR),
+            ToTensor(),
+            Normalize(mean=mean, std=std),
+        ])
+
+    def __call__(self, image):
+        return self.transform(image)
 
 class AddGaussianNoise(object):
     """
