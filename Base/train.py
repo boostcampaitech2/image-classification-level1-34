@@ -128,11 +128,8 @@ def rand_bbox(size, lam): # size : [Batch_size, Channel, Width, Height]
     cut_h = np.int(H * cut_rat)  
 
    	# 패치의 중앙 좌표 값 cx, cy
-    cx = np.random.randint(W)
-    cy = np.random.randint(H) 
-
-    # 마스크 위로 비교하기 위해 y 기준을 높임
-    cy = cy * 1.5 
+    cx = np.random.randint(W*0.4)
+    cy = np.random.randint(H*0.4, H*0.8) 
 
     # 패치 모서리 좌표 값 
     bbx1 = np.clip(cx - cut_w // 2, 0, W)
@@ -214,6 +211,7 @@ def train(data_dir, model_dir, args):
         BATCH_SIZE = args.batch_size
         LEARNING_RATE = args.lr
         SCHEDULAR = "CosineAnnealingWarm"
+        CREITERION = args.criterion
         AUGMENTATION = args.augmentation
         VAL_SPLIT = args.val_ratio
         DATASET = args.dataset
@@ -223,7 +221,7 @@ def train(data_dir, model_dir, args):
         # -- wandb
         wandb.login()
         config = {
-        'epochs': NUM_EPOCH, 'batch_size': BATCH_SIZE, 'learning_rate': LEARNING_RATE, 'shedular': SCHEDULAR,
+        'epochs': NUM_EPOCH, 'batch_size': BATCH_SIZE, 'learning_rate': LEARNING_RATE, 'Schedular': SCHEDULAR, 'Criterion': CREITERION
         'val_split': VAL_SPLIT,  'Augmentation': AUGMENTATION, 'Dataset': DATASET, 'cutmix.beta': BETA, 'cutmix.prob': PROB
         }
 
@@ -275,7 +273,7 @@ def train(data_dir, model_dir, args):
                 preds = torch.argmax(outs, dim=-1)
                 loss.backward()
                 optimizer.step()
-                #scheduler.step()
+                scheduler.step()
                 
                 train_f1 += f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
                 n_iter += 1
