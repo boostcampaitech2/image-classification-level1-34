@@ -11,7 +11,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR, CosineAnnealingWarmRestarts
 from torch.utils.data.sampler import WeightedRandomSampler
 
 from torch.utils.tensorboard import SummaryWriter
@@ -23,6 +23,7 @@ import wandb
 import torchvision
 from sklearn.metrics import f1_score
 from sklearn.model_selection import StratifiedKFold
+from tqdm import tqdm
 
 def seed_everything(seed):
     torch.manual_seed(seed)
@@ -198,7 +199,8 @@ def train(data_dir, model_dir, args):
             lr=args.lr,
             weight_decay=5e-4
         )
-        scheduler = CosineAnnealingLR(optimizer, T_max=5, eta_min=0)
+        scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=5, T_mult=2, eta_min=0.001)
+        #scheduler = CosineAnnealingLR(optimizer, T_max=5, eta_min=0)
 
         # -- logging
         logger = SummaryWriter(log_dir=save_dir)
@@ -209,18 +211,19 @@ def train(data_dir, model_dir, args):
         NUM_EPOCH = args.epochs
         BATCH_SIZE = args.batch_size
         LEARNING_RATE = args.lr
-        SCHEDULAR = "CosineAnnealingLR"
+        SCHEDULAR = "CosineAnnealingWarmRestarts"
         AUGMENTATION = args.augmentation
         VAL_SPLIT = args.val_ratio
         DATASET = args.dataset
         CRITERION = args.criterion
+        RESIZE = args.resize
         
         # -- wandb
         wandb.login()
         config = {
         'epochs': NUM_EPOCH, 'batch_size': BATCH_SIZE, 'learning_rate': LEARNING_RATE,
         'val_split': VAL_SPLIT,  'Augmentation': AUGMENTATION, 'Dataset': DATASET, 'Criterion': CRITERION, 
-        'schedular': SCHEDULAR
+        'Schedular': SCHEDULAR, 'Resize': RESIZE
         # Wandb에 남기고 싶은 config log가 있다면 여기에 넣어주시면 됩니다 :)
         }
 
@@ -237,6 +240,9 @@ def train(data_dir, model_dir, args):
         best_val_loss = np.inf
 
 
+        '''
+        Train
+        '''
         for epoch in range(args.epochs):
             # train loop
             model.train()
@@ -244,7 +250,7 @@ def train(data_dir, model_dir, args):
             train_acc = 0
             train_f1 = 0
 
-            for idx, train_batch in enumerate(train_loader):
+            for idx, train_batch in enumerate(tqdm(train_loader)):
                 inputs, labels = train_batch
                 inputs = inputs.to(device)
                 labels = labels.to(device)
@@ -263,9 +269,11 @@ def train(data_dir, model_dir, args):
                 train_acc += (preds == labels).sum().item()
                 train_f1 += f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
                 
+                '''
                 if (idx + 1) % args.log_interval == 0:
-                    middle_train_loss = train_loss / (idx + 1)
-                    middle_train_acc = train_acc / (args.batch_size * (idx+1))
+                    # 20배치마다 로그 생성 - middle loss, acc 확인
+                    middle_train_loss = train_loss / args.log_interval
+                    middle_train_acc = train_acc / args.batch_size / args.log_interval
                     middle_f1 = train_f1/(idx+1)
                     
                     current_lr = get_lr(optimizer)
@@ -275,15 +283,20 @@ def train(data_dir, model_dir, args):
                     )
                     logger.add_scalar("Train/loss", train_loss, epoch * len(train_loader) + idx)
                     logger.add_scalar("Train/accuracy", train_acc, epoch * len(train_loader) + idx)
+                '''
+            epoch_train_loss = train_loss / (len(train_loader.dataset))
+            epoch_train_acc = train_acc / (len(train_loader.dataset))
+            epoch_train_f1 = train_f1 / (idx+1)
             
-            final_train_loss = train_loss / (len(train_loader))
-            final_train_acc = train_acc / (len(train_loader))
-            final_train_f1 = train_f1/(idx+1)
+            print(
+                    f"*****Epoch [{epoch}] Train Done!*****\n"
+                    f"[Train] acc : {epoch_train_acc:4.2%}, loss: {epoch_train_loss:4.2}"
+                )
 
             wandb.log({
-                        "train loss": final_train_loss,
-                        "train acc" : final_train_acc,
-                        "train f1": final_train_f1,
+                        "train loss": epoch_train_loss,
+                        "train acc" : epoch_train_acc,
+                        "train f1": epoch_train_f1,
                     })
             
 
@@ -293,19 +306,20 @@ def train(data_dir, model_dir, args):
             logger.add_image(f'{epoch}_train_input_img', img_grid, epoch)
             
 
-            # val loop
+            '''
+            validation
+            '''
             with torch.no_grad():
-                print("Calculating validation results...")
+                #print("Calculating validation results...")
                 model.eval()
                 # Threshold - 이 값 넘겨야 저장
-                val_acc_c = 0.6
-                val_f1_c = 0.6
+                #val_acc_c = 0.6
+                #val_f1_c = 0.6
                 val_loss = 0
                 val_acc = 0
                 val_f1 = 0
                 figure = None
-                n_iter = 0
-                for idx, val_batch in enumerate(val_loader):
+                for idx, val_batch in enumerate(tqdm(val_loader)):
                     inputs, labels = val_batch
                     inputs = inputs.to(device)
                     labels = labels.to(device)
@@ -327,24 +341,24 @@ def train(data_dir, model_dir, args):
                         figure = grid_image(
                             inputs_np, labels, preds, n=16, shuffle=args.dataset != "MaskSplitByProfileDataset"
                         )
-                    n_iter += 1
 
-                val_f1 = val_f1 / n_iter
+                val_f1 = val_f1 / len(val_loader)
                 val_loss = val_loss / len(val_loader.dataset)
                 val_acc = val_acc / len(val_loader.dataset)
-                #print(len(val_loader))
 
                 best_val_loss = min(best_val_loss, val_loss)
 
                 if val_acc > best_val_acc or val_f1 > best_val_f1:
-                    print(f"New best model for val accuracy or f1 : {val_acc:4.2%}|| {val_f1:4.2%}! saving the best model..")
+                    print(
+                        f"***New best model!*** acc: {val_acc:4.2%}, f1: {val_f1:4.2%}")
                     torch.save(model.module.state_dict(), f"{save_dir}/{fold}_{epoch}_accuracy_{val_acc:4.2%}_f1_{val_f1:4.2%}.pth")
                     best_val_acc = val_acc
                     best_val_f1 = val_f1
                     
                 print(
-                    f"[Val] acc : {val_acc:4.2%}, loss: {val_loss:4.2} || "
-                    f"best f1 : {best_val_f1:4.2%},best acc : {best_val_acc:4.2%}, best loss: {best_val_loss:4.2}"
+                    f"*****Epoch [{epoch}] Valid Done!*****\n"
+                    f"[Val] acc : {val_acc:4.2%}, loss: {val_loss:4.2}\n"
+                    f"[Val] best f1 : {best_val_f1:4.2%}, best acc : {best_val_acc:4.2%}, best loss: {best_val_loss:4.2}"
                 )
                 logger.add_scalar("Val/loss", val_loss, epoch)
                 logger.add_scalar("Val/accuracy", val_acc, epoch)
@@ -382,14 +396,14 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, default='MaskSplitByProfileDataset', help='dataset augmentation type (default: MaskSplitByProfileDataset)')
     parser.add_argument('--augmentation', type=str, default='BaseAugmentation', help='data augmentation type (default: BaseAugmentation)')
     parser.add_argument('--sampler', type=bool, default=False, help='use weighted sampler (default: false)')
-    parser.add_argument("--resize", nargs="+", type=list, default=[128, 96], help='resize size for image when training')
+    parser.add_argument("--resize", nargs="+", type=list, default=[224, 224], help='resize size for image when training')
     parser.add_argument('--batch_size', type=int, default=64, help='input batch size for training (default: 64)')
     parser.add_argument('--valid_batch_size', type=int, default=1000, help='input batch size for validing (default: 1000)')
     parser.add_argument('--model', type=str, default='ResNet18', help='model type (default: ResNet18)')
     parser.add_argument('--optimizer', type=str, default='AdamW', help='optimizer type (default: AdamW)')
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate (default: 1e-3)')
     parser.add_argument('--val_ratio', type=float, default=0.2, help='ratio for validaton (default: 0.2)')
-    parser.add_argument('--criterion', type=str, default='cross_entropy', help='criterion type (default: cross_entropy, menu: focal, f1, label_smoothing)')
+    parser.add_argument('--criterion', type=str, default='focal', help='criterion type (default: cross_entropy, menu: focal, f1, label_smoothing)')
     parser.add_argument('--lr_decay_step', type=int, default=20, help='learning rate scheduler deacy step (default: 20)')
     parser.add_argument('--log_interval', type=int, default=20, help='how many batches to wait before logging training status')
     parser.add_argument('--name', default='exp', help='model save at {SM_MODEL_DIR}/{name}')

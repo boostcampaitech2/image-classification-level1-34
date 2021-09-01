@@ -1,1 +1,1 @@
-python train.py --wandb_name "SY_cosineann_focal_centorCrop" --criterion focal --epoch 30
+python train.py --wandb_name "SY_ResizeTest_224224_" --criterion focal
