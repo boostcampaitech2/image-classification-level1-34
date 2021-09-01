@@ -11,6 +11,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import seaborn as sns
 from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR
 from torch.utils.data.sampler import WeightedRandomSampler
 
@@ -21,8 +22,25 @@ from loss import create_criterion
 
 import wandb
 import torchvision
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, confusion_matrix
 from sklearn.model_selection import StratifiedKFold
+
+
+def print_confusion_matrix(cm):
+    length = cm.shape[0]
+    for i in range(length):
+        print("%3d"%i, end='')
+    print()
+    print("   __"*length)
+    for idx in range(length):
+        print("%2d|"%idx,end='')
+        print()
+        for jdx in range(length):
+            print("%4d"%cm[idx,jdx],end='|')
+        print()
+        print("   __"*length)
+        
+    
 
 def seed_everything(seed):
     torch.manual_seed(seed)
@@ -274,8 +292,8 @@ def train(data_dir, model_dir, args):
                     logger.add_scalar("Train/loss", train_loss, epoch * len(train_loader) + idx)
                     logger.add_scalar("Train/accuracy", train_acc, epoch * len(train_loader) + idx)
             
-            final_train_loss = train_loss / (len(train_loader))
-            final_train_acc = train_acc / (len(train_loader))
+            final_train_loss = train_loss / (len(train_loader.dataset))
+            final_train_acc = train_acc / (len(train_loader.dataset))
             final_train_f1 = train_f1/(idx+1)
 
             wandb.log({
@@ -300,6 +318,8 @@ def train(data_dir, model_dir, args):
                 val_f1 = 0.6 # 초기값 설정 : 이것보다 넘겨야 저장
                 n_iter = 0
                 figure = None
+                cm = np.zeros((num_classes,num_classes))
+
                 for idx, val_batch in  enumerate(val_loader):
 
                     inputs, labels = val_batch
@@ -315,6 +335,8 @@ def train(data_dir, model_dir, args):
                     val_loss += loss_item
                     val_acc += acc_item
                     val_f1 += f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
+                    
+                    cm += confusion_matrix(labels.cpu().numpy(), preds.cpu().numpy(),labels=list(range(num_classes)))
 
                     if figure is None:
                         inputs_np = torch.clone(inputs).detach().cpu().permute(0, 2, 3, 1).numpy()
@@ -322,10 +344,27 @@ def train(data_dir, model_dir, args):
                         figure = grid_image(
                             inputs_np, labels, preds, n=16, shuffle=args.dataset != "MaskSplitByProfileDataset"
                         )
+                ##########
+                # Confusion Matrix입니다, 마지막 Epoch(모델 학습이 끝난 시점에 save_dir에 png이미지로 저장됩니다.)
+                ##########
+                
+                # 주석을 풀어 사용해 주세요
+                # if epoch == 0:
+                #     plt.figure(figsize=(15,13))
+                #     plt.title("Validation CM %s"%args.wandb_name)
+                #     sns.heatmap(cm.astype(int), cmap='Blues', annot=True, fmt="d")
+                    
+                #     plt.savefig(save_dir+"/Confusion.png")
 
-                val_f1 = val_f1 / len(val_loader)
-                val_loss = val_loss / len(val_loader.dataset)
-                val_acc = val_acc / len(val_loader.dataset)
+                # val_f1 = val_f1 / len(val_loader)
+                # val_loss = val_loss / len(val_loader.dataset)
+                # val_acc = val_acc / len(val_loader.dataset)
+                # 주석을 풀어 사용해 주세요
+
+
+                
+                print("Print Validaition Confusion Matrix..")
+                print_confusion_matrix(cm)
 
                 best_val_loss = min(best_val_loss, val_loss)
 
@@ -375,21 +414,21 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, default='MaskSplitByProfileDataset', help='dataset augmentation type (default: MaskSplitByProfileDataset)')
     parser.add_argument('--augmentation', type=str, default='BaseAugmentation', help='data augmentation type (default: BaseAugmentation)')
     parser.add_argument('--sampler', type=bool, default=False, help='use weighted sampler (default: false)')
-    parser.add_argument("--resize", nargs="+", type=list, default=[128, 96], help='resize size for image when training')
+    parser.add_argument("--resize", nargs="+", type=list, default=[224, 56], help='resize size for image when training')
     parser.add_argument('--batch_size', type=int, default=64, help='input batch size for training (default: 64)')
     parser.add_argument('--valid_batch_size', type=int, default=1000, help='input batch size for validing (default: 1000)')
     parser.add_argument('--model', type=str, default='ResNet18', help='model type (default: ResNet18)')
     parser.add_argument('--optimizer', type=str, default='AdamW', help='optimizer type (default: AdamW)')
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate (default: 1e-3)')
     parser.add_argument('--val_ratio', type=float, default=0.2, help='ratio for validaton (default: 0.2)')
-    parser.add_argument('--criterion', type=str, default='cross_entropy', help='criterion type (default: cross_entropy, menu: focal, f1, label_smoothing)')
+    parser.add_argument('--criterion', type=str, default='focal', help='criterion type (default: focal, menu: focal, f1, label_smoothing)')
     parser.add_argument('--lr_decay_step', type=int, default=20, help='learning rate scheduler deacy step (default: 20)')
     parser.add_argument('--log_interval', type=int, default=20, help='how many batches to wait before logging training status')
     parser.add_argument('--name', default='exp', help='model save at {SM_MODEL_DIR}/{name}')
     parser.add_argument('--wandb_name', required=False, type=str, default='name_nth_modelname', help='model name shown in wandb. (Usage: name_nth_modelname, Example: seyoung_1st_resnet18')
 
     # Container environment
-    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '/opt/ml/P01/data/train/images'))
+    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '/opt/ml/input/data/train/images'))
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR', './model'))
 
     args = parser.parse_args()
