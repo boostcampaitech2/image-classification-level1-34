@@ -11,6 +11,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import seaborn as sns
 from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR, CosineAnnealingWarmRestarts
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -21,7 +22,7 @@ from loss import create_criterion
 import torch.optim as optim
 import wandb
 import torchvision
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, confusion_matrix
 from sklearn.model_selection import StratifiedKFold
 
 def seed_everything(seed):
@@ -114,6 +115,22 @@ def getDataloader(dataset, train_idx, valid_idx, batch_size, num_workers):
     
     # 생성한 DataLoader 반환
     return train_loader, val_loader
+
+
+def print_confusion_matrix(cm):
+    length = cm.shape[0]
+    for i in range(length):
+        print("%3d"%i, end='')
+    print()
+    print("   __"*length)
+    for idx in range(length):
+        print("%2d|"%idx,end='')
+        print()
+        for jdx in range(length):
+            print("%4d"%cm[idx,jdx],end='|')
+        print()
+        print("   __"*length)
+
 
 def rand_bbox(size, lam): # size : [Batch_size, Channel, Width, Height]
     """
@@ -315,6 +332,8 @@ def train(data_dir, model_dir, args):
                 val_loss_items = []
                 val_acc_items = []
                 figure = None
+                cm = np.zeros((num_classes,num_classes))    
+                
                 for val_batch in val_loader:
                     inputs, labels = val_batch
                     inputs = inputs.to(device)
@@ -328,12 +347,22 @@ def train(data_dir, model_dir, args):
                     val_loss_items.append(loss_item)
                     val_acc_items.append(acc_item)
 
+                    cm += confusion_matrix(labels.cpu().numpy(), preds.cpu().numpy(),labels=list(range(num_classes)))
+
                     if figure is None:
                         inputs_np = torch.clone(inputs).detach().cpu().permute(0, 2, 3, 1).numpy()
                         inputs_np = dataset_module.denormalize_image(inputs_np, dataset.mean, dataset.std)
                         figure = grid_image(
                             inputs_np, labels, preds, n=16, shuffle=args.dataset != "MaskSplitByProfileDataset"
                         )
+
+                if epoch % 5 == 4:
+                    plt.figure(figsize=(15,13))
+                    plt.title("Validation CM %s"%args.wandb_name)
+                    sns.heatmap(cm.astype(int), cmap='Blues', annot=True, fmt="d")
+
+                    plt.savefig(f"{save_dir}/{epoch}_Confusion.png")
+        
                 val_f1 = f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
                 val_loss = np.sum(val_loss_items) / len(val_loader)
                 val_acc = np.sum(val_acc_items) / len(valid_idx) 
@@ -342,11 +371,15 @@ def train(data_dir, model_dir, args):
                     print(f"New best model for val accuracy or f1 : {val_acc:4.2%}|| {val_f1:4.2%}! saving the best model..")
                     torch.save(model.module.state_dict(), f"{save_dir}/{fold}_{epoch}_accuracy_{val_acc:4.2%}_f1_{val_f1:4.2%}.pth")
                     best_val_acc = val_acc
-                    best_val_f1 = val_f1
+                    best_val_f1 = val_f1   
                 print(
                     f"[Val] acc : {val_acc:4.2%}, loss: {val_loss:4.2} || "
-                    f"best f1 : {best_val_f1:4.2%},best acc : {best_val_acc:4.2%}, best loss: {best_val_loss:4.2}"
+                    f"best f1 : {best_val_f1:4.2%}, best acc : {best_val_acc:4.2%}, best loss: {best_val_loss:4.2}"
                 )
+
+                print("Print Validaition Confusion Matrix..")
+                print_confusion_matrix(cm)
+
                 logger.add_scalar("Val/loss", val_loss, epoch)
                 logger.add_scalar("Val/accuracy", val_acc, epoch)
                 logger.add_figure("results", figure, epoch)
@@ -399,8 +432,8 @@ if __name__ == '__main__':
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR', './model'))
 
     # cutmix setting
-    parser.add_argument('--beta', default=0.2, type=float, help='hyperparameter beta')
-    parser.add_argument('--cutmix_prob', default=0.6, type=float, help='cutmix probability')
+    parser.add_argument('--beta', default=0, type=float, help='hyperparameter beta')
+    parser.add_argument('--cutmix_prob', default=0, type=float, help='cutmix probability')
 
     args = parser.parse_args()
     print(args)

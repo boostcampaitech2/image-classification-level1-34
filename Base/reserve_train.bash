@@ -1,3 +1,4 @@
 #!/bin/bash
-python train.py --wandb_name "Jin_resnet_newcutmix_2" --cutmix_prob 0.8
-python train.py --wandb_name "Jin_resnet_newcutmix_3" --cutmix_prob 0.4
+
+# python train.py --wandb_name "Jin_resnet_newcutmix5" --cutmix_prob 0 --epochs 15
+python train.py --wandb_name "Jin_resnet_newcutmix6" --beta 0.1 --cutmix_prob 0.3 --epochs 15
