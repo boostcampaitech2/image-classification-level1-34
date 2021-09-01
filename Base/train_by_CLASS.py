@@ -204,7 +204,7 @@ def train(data_dir, model_dir, args):
             num_classes=num_classes
         ).to(device)
         model = torch.nn.DataParallel(model)
-        
+
         # -- loss & metric
         criterion = create_criterion(args.criterion)  # default: cross_entropy
         """
@@ -264,7 +264,7 @@ def train(data_dir, model_dir, args):
             train_f1 = 0
 
             for idx, train_batch in enumerate(train_loader):
-                inputs, labels = train_batch
+                inputs, labels, path = train_batch
                 inputs = inputs.to(device)
                 labels = labels.to(device)
 
@@ -335,9 +335,10 @@ def train(data_dir, model_dir, args):
 
                 pred_list = [] 
                 labels_list = []
+                path_list = []
                 for idx, val_batch in  enumerate(val_loader):
 
-                    inputs, labels = val_batch
+                    inputs, labels, path = val_batch
                     inputs = inputs.to(device)
                     labels = labels.to(device)
 
@@ -348,6 +349,7 @@ def train(data_dir, model_dir, args):
 
                     labels_list.extend(labels.cpu().tolist())
                     pred_list.extend(preds.cpu().tolist())
+                    path_list.extend(path)
 
                     cm += confusion_matrix(labels.cpu().numpy(), preds.cpu().numpy(),labels=list(range(num_classes)))
 

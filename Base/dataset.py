@@ -253,6 +253,7 @@ class MaskBaseDataset(Dataset):
         age_label = self.get_age_label(index)
         multi_class_label = self.encode_multi_class(mask_label, gender_label, age_label)
         
+        path = self.image_paths[index]
         if self.label == "age":
             ret_label = age_label
         elif self.label == "gender":
@@ -264,7 +265,7 @@ class MaskBaseDataset(Dataset):
 
         image_transform = self.transform(image)
         #image_transform = self.transform(image=np.array(image))['image']
-        return image_transform, ret_label
+        return image_transform, ret_label, path
 
     def __len__(self):
         return len(self.image_paths)
