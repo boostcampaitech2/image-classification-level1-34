@@ -3,19 +3,22 @@ import random
 from collections import defaultdict
 from enum import Enum
 from typing import Tuple, List
+from albumentations.augmentations.transforms import GridDistortion
 
 import numpy as np
 import torch
 from PIL import Image
 from torch.utils.data import Dataset, Subset, random_split
+from torch.utils.tensorboard.summary import image
 from torchvision import transforms
 from torchvision.transforms import *
 
 from sklearn.model_selection import StratifiedKFold
 from tqdm import tqdm
 
-#from albumentations import *
-#from albumentations.pytorch import ToTensorV2
+import albumentations as A
+#import albumentations.pytorch
+from albumentations.pytorch import ToTensorV2
 
 IMG_EXTENSIONS = [
     ".jpg", ".JPG", ".jpeg", ".JPEG", ".png",
@@ -111,6 +114,31 @@ class CustomAugmentation:
     def __call__(self, image):
         return self.transformations
 '''
+class AlbumentationsDataset:
+    def __init__(self, resize, mean, std, **args):
+        self.transform = A.Compose([
+            GridDistortion(p=1.0),
+            ToTensorV2(p=1.0),
+        ], p=1.0)
+
+    def __call__(self, image):
+        return self.transform
+
+class CustomAugmentation:
+    def __init__(self, resize, mean, std, **args):
+        
+        self.transform = transforms.Compose([
+            CenterCrop((320, 256)),
+            Resize(resize, Image.BILINEAR),
+            ColorJitter(0.1, 0.1, 0.1, 0.1),
+            ToTensor(),
+            Normalize(mean=mean, std=std),
+            AddGaussianNoise()
+        ])
+
+    def __call__(self, image):
+        return self.transform(image)
+
 
 class MaskLabels(int, Enum):
     MASK = 0
@@ -231,9 +259,23 @@ class MaskBaseDataset(Dataset):
         age_label = self.get_age_label(index)
         multi_class_label = self.encode_multi_class(mask_label, gender_label, age_label)
 
-        image_transform = self.transform(image)
+        #image_transform = self.transform(image)
         #image_transform = self.transform(image=np.array(image))['image']
-        return image_transform, multi_class_label
+
+        albumentations_transform = A.Compose([
+                GridDistortion(p=1.0),
+                A.HorizontalFlip(p=0.5),
+                A.GaussNoise(p=0.5),
+                ToTensorV2(p=1.0),
+        ], p=1.0)
+
+        augmented = albumentations_transform(image=np.array(image))
+        image_transform = augmented['image']
+
+        # augmented = albumentations_transform(image=image)
+        # image_transform = augmented['image']
+        
+        return image_transform.float(), multi_class_label
 
     def __len__(self):
         return len(self.image_paths)
