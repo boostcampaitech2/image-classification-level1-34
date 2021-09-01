@@ -271,7 +271,7 @@ def train(data_dir, model_dir, args):
 
                 if val_acc > best_val_acc or val_f1 > best_val_f1:
                     print(f"New best model for val accuracy or f1 : {val_acc:4.2%}|| {val_f1:4.2%}! saving the best model..")
-                    torch.save(model, f"{save_dir}/{fold}_{epoch}_accuracy_{val_acc:4.2%}_f1_{val_f1:4.2%}.pth")
+                    torch.save(model.module.state_dict(), f"{save_dir}/{fold}_{epoch}_accuracy_{val_acc:4.2%}_f1_{val_f1:4.2%}.pth")
                     best_val_acc = val_acc
                     best_val_f1 = val_f1
                     
