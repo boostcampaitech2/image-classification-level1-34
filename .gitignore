@@ -5,7 +5,7 @@
 .env
 
 # ignore pycache
-__pycache__
+/__pycache__
 
 # ignore model saved file and output file
 /Base/model

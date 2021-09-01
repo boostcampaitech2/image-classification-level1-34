@@ -433,11 +433,33 @@ class TestDataset(Dataset):
         ])
 
     def __getitem__(self, index):
-        image = Image.open(self.img_paths[index])
 
-        if self.transform:
-            image = self.transform(image)
-        return image
+        image = cv2.imread(self.img_paths[index])
+        rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        face = cascade.detectMultiScale(rgb)
+        if len(face) == 0:
+            croped = rgb[100:400, 80:280]
+        else:
+            for x, y, w, h in face:
+                if w < 100:
+                    croped = rgb[100:400, 80:280]
+                    break
+                croped = rgb[max(0,y-50):min(y+h+20, 512), x:x+w]
+        
+        crop_img = Image.fromarray(croped)
+        crop_img = transforms.Resize((224,224))(crop_img)
+        
+        image_transform = self.transform(crop_img)
+        image_transform = torch.tensor(image_transform, dtype=torch.float)
+
+        return image_transform
+
+        # image = Image.open(self.img_paths[index])
+
+        # if self.transform:
+        #     image = self.transform(image)
+        # return image
 
     def __len__(self):
         return len(self.img_paths)
