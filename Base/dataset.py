@@ -145,9 +145,9 @@ class GenderLabels(int, Enum):
 
 class AgeLabels(int, Enum):
     YOUNG = 0
-    MIDDLE1 = 1 
-    MIDDLE2 = 2   ### edit point
-    OLD = 3
+    MIDDLE = 1 
+#    MIDDLE2 = 2   ### edit point
+    OLD = 2
 
     @classmethod
     def from_number(cls, value: str) -> int:
@@ -158,10 +158,10 @@ class AgeLabels(int, Enum):
 
         if value < 30:
             return cls.YOUNG
-        elif value < 45:  # default 60
-            return cls.MIDDLE1
+#        elif value < 45:  # default 60
+#            return cls.MIDDLE
         elif value < 60:  # default 60   ### edit point
-            return cls.MIDDLE2
+            return cls.MIDDLE
         else:
             return cls.OLD
 
@@ -195,7 +195,7 @@ class MaskBaseDataset(Dataset):
         self.calc_statistics()
         self.label = label
         if self.label == "age":
-            self.num_classes = 4   ### edit point
+            self.num_classes = 3   ### edit point
         elif self.label == "gender":
             self.num_classes = 2
         elif self.label == "state":
