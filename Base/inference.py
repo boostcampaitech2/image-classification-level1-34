@@ -32,7 +32,15 @@ def inference(data_dir, model_dir, output_dir, args):
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    num_classes = MaskBaseDataset.num_classes  # 18
+    if args.label == "age":
+        num_classes = 3
+    elif args.label == "gender":
+        num_classes = 2
+    elif args.label == "state":
+        num_classes = 3
+    else:
+        num_classes = 18
+
     model = load_model(model_dir, num_classes, device).to(device)
     model.eval()
 
