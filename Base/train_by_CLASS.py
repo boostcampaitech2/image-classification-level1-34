@@ -212,7 +212,6 @@ def train(data_dir, model_dir, args):
     n_splits = 5
     skf = StratifiedKFold(n_splits=n_splits)
 
-    
     # get labels
     if args.label=="age":
         labels = dataset.age_labels
@@ -222,13 +221,27 @@ def train(data_dir, model_dir, args):
         labels = dataset.mask_labels
     else:
         labels = [dataset.encode_multi_class(mask, gender, age) for mask, gender, age in zip(dataset.mask_labels, dataset.gender_labels, dataset.age_labels)]
+        
     
 
-    df = pd.DataFrame()
+    
     for fold, (train_idx, valid_idx) in enumerate(skf.split(dataset.image_paths, labels)):
         # -- data_loader
         # 생성한 Train, Valid Index를 getDataloader 함수에 전달해 train/valid DataLoader를 생성합니다.
         # 생성한 train, valid DataLoader로 이전과 같이 모델 학습을 진행합니다. 
+        
+        if args.label=="age":
+            labels = dataset.age_labels
+        elif args.label=="gender":
+            labels = dataset.gender_labels
+        elif args.label=="state":
+            labels = dataset.mask_labels
+        else:
+            labels = [dataset.encode_multi_class(mask, gender, age) for mask, gender, age in zip(dataset.mask_labels, dataset.gender_labels, dataset.age_labels)]
+            
+    
+        
+        df = pd.DataFrame()
         df["label"] = labels
         labels = df.iloc[train_idx].to_numpy().squeeze().tolist()
 
