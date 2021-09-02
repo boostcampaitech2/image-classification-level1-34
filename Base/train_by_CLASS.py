@@ -1,3 +1,4 @@
+#%%
 import argparse
 import glob
 import json
@@ -91,28 +92,28 @@ def increment_path(path, exist_ok=False):
 # sampler를 사용할 때에는 index를 조작해야 하기 때문에 shuffle=False로 설정해야 합니다. 
 def getDataloader(dataset, train_idx, valid_idx, batch_size, num_workers, sampler=None):
     # 인자로 전달받은 dataset에서 train_idx에 해당하는 Subset 추출
-    train_set = torch.utils.data.Subset(dataset,
-                                        indices=train_idx)
+    train_set = torch.utils.data.Subset(dataset, indices=train_idx)
     # 인자로 전달받은 dataset에서 valid_idx에 해당하는 Subset 추출
-    val_set   = torch.utils.data.Subset(dataset,
-                                        indices=valid_idx)
+    val_set   = torch.utils.data.Subset(dataset, indices=valid_idx)
     
+    print(len(train_set), len(val_set))
+
+
     # 추출된 Train Subset으로 DataLoader 생성
     train_loader = torch.utils.data.DataLoader(
         train_set,
         batch_size=batch_size,
         num_workers=num_workers,
-        drop_last=True,
-        sampler=sampler,
-        shuffle=False
+        shuffle=False,
+        sampler=sampler
     )
     # 추출된 Valid Subset으로 DataLoader 생성
     val_loader = torch.utils.data.DataLoader(
         val_set,
         batch_size=batch_size,
+        shuffle=False,
         num_workers=num_workers,
-        drop_last=True,
-        shuffle=False
+        drop_last=True
     )
     
     # 생성한 DataLoader 반환
@@ -158,19 +159,22 @@ def rand_bbox(size, lam): # size : [Batch_size, Channel, Width, Height]
    
     return bbx1, bby1, bbx2, bby2
 
+
 def make_weights_for_balanced_classes(labels, nclasses=18):                        
     count = [0] * nclasses
+    print(nclasses)
     #라벨 개수를 count에 저장
     for label in labels:
         count[label] += 1
     weight_per_class = [0.] * nclasses
-    N = float(sum(count))                                                   
-    for i in range(nclasses):                                                   
-        weight_per_class[i] = N/float(count[i])                                 
-    weight = [0] * len(labels)                                              
+    N = float(sum(count)) 
+    for i in range(nclasses): 
+        weight_per_class[i] = 1. / float(count[i])
+    weight = [0] * len(labels)
     for idx, val in enumerate(labels):                                          
         weight[idx] = weight_per_class[val]                                  
-    return weight 
+    return weight #len(weight)==len(labels). 
+    
 
 
 def train(data_dir, model_dir, args):
@@ -208,18 +212,33 @@ def train(data_dir, model_dir, args):
     n_splits = 5
     skf = StratifiedKFold(n_splits=n_splits)
 
-    labels = [dataset.encode_multi_class(mask, gender, age) for mask, gender, age in zip(dataset.mask_labels, dataset.gender_labels, dataset.age_labels)]
+    
+    # get labels
+    if args.label=="age":
+        labels = dataset.age_labels
+    elif args.label=="gender":
+        labels = dataset.gender_labels
+    elif args.label=="state":
+        labels = dataset.mask_labels
+    else:
+        labels = [dataset.encode_multi_class(mask, gender, age) for mask, gender, age in zip(dataset.mask_labels, dataset.gender_labels, dataset.age_labels)]
+    
+
+    df = pd.DataFrame()
     for fold, (train_idx, valid_idx) in enumerate(skf.split(dataset.image_paths, labels)):
         # -- data_loader
         # 생성한 Train, Valid Index를 getDataloader 함수에 전달해 train/valid DataLoader를 생성합니다.
         # 생성한 train, valid DataLoader로 이전과 같이 모델 학습을 진행합니다. 
-        
+        df["label"] = labels
+        labels = df.iloc[train_idx].to_numpy().squeeze().tolist()
+
         if args.sampler==True:
             '''
             샘플러 정의
             weighted_sampler = 어쩌고 저쩌고
             '''
-            weights = make_weights_for_balanced_classes(labels, 18)
+            weights = make_weights_for_balanced_classes(labels, num_classes)
+            #print(weights)
             weights = torch.DoubleTensor(weights)
             weighted_sampler = WeightedRandomSampler(weights, len(weights))
             train_loader, val_loader = getDataloader(dataset, train_idx, valid_idx, batch_size, num_workers, weighted_sampler)
@@ -293,9 +312,10 @@ def train(data_dir, model_dir, args):
             train_f1 = 0
 
             for idx, train_batch in enumerate(train_loader):
-                inputs, labels, path = train_batch
+                inputs, labels, path, state = train_batch
                 inputs = inputs.to(device)
                 labels = labels.to(device)
+    
 
                 optimizer.zero_grad()
 
@@ -324,6 +344,14 @@ def train(data_dir, model_dir, args):
                 train_loss += loss.item()
                 train_acc += (preds == labels).sum().item()
                 train_f1 += f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
+                
+                # Weighted Random Sampler 검증
+                label, counts =  np.unique(labels.cpu().numpy(), return_counts =True)
+                #print(label)
+                #print(counts)
+                #plt.boxplot(list(label), list(counts))
+                #plt.show()
+
 
                 if (idx + 1) % args.log_interval == 0:
                     middle_train_loss = train_loss / (idx + 1)
@@ -367,7 +395,7 @@ def train(data_dir, model_dir, args):
                 path_list = []
                 for idx, val_batch in  enumerate(val_loader):
 
-                    inputs, labels, path = val_batch
+                    inputs, labels, path, state = val_batch
                     inputs = inputs.to(device)
                     labels = labels.to(device)
 
@@ -490,3 +518,4 @@ if __name__ == '__main__':
     model_dir = args.model_dir
 
     train(data_dir, model_dir, args)
+# %%
