@@ -11,3 +11,8 @@ __pycache__
 /Base/model
 /Base/output
 /Base/wandb
+
+.gitignore
+
+model
+wandb
