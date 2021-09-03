@@ -3,7 +3,6 @@ Code for image-classification Competition by AiStage
 To read the detailed report, please, refer to [team report](https://docs.google.com/document/d/11l_-q7Ty8surMZOrsSj1mW8eUQlU4gp7/edit?usp=sharing&ouid=111990686605667040701&rtpof=true&sd=true)
 
 ## Requirements
-
 1. pytorch 1.6.0
 2. torchvision 0.7.0
 3. pandas 1.1.5
@@ -36,7 +35,7 @@ To train models, run follwing commands.
 ```
 $ python train.py SM_CHANNEL_TRAIN=[train image dir] SM_MODEL_DIR=[model saving dir]
 ```
-You can add arguments for more detailed train
+You can add arguments for more detailed train.
 
 ### Pretrained models
 You can download pretrained model that used for my trian from [Link](https://pytorch.org/hub/pytorch_vision_resnet/)
