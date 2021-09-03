@@ -320,7 +320,6 @@ def train(data_dir, model_dir, args):
                 print("Calculating validation results...")
                 model.eval()
                 val_loss = 0
-                n_iter = 0
                 figure = None
                 cm = np.zeros((num_classes,num_classes))    
 
@@ -334,14 +333,9 @@ def train(data_dir, model_dir, args):
 
                     outs = model(inputs)
                     preds = torch.argmax(outs, dim=-1)
-
-                    loss_item = criterion(outs, labels).item()
-                    acc_item = (labels == preds).sum().item()
                     
-                    val_loss += loss_item
-                    val_acc += acc_item
-                    val_f1 += f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro')
-
+                    val_loss += criterion(outs, labels).item()
+                    
                     labels_list.extend(labels.cpu().tolist())
                     pred_list.extend(preds.cpu().tolist())
                     path_list.extend(path)
@@ -354,14 +348,6 @@ def train(data_dir, model_dir, args):
                         figure = grid_image(
                             inputs_np, labels, preds, n=16, shuffle=args.dataset != "MaskSplitByProfileDataset"
                         )
-
-
- '''???????????????????????'''
-                val_f1 = val_f1 / n_iter
-                val_loss = val_loss / len(val_loader)
-                val_acc = val_acc / len(val_loader)
-
-                best_val_loss = min(best_val_loss, val_loss)
 
                 df[f"epoch_{epoch}_path"] = path_list
                 df[f"epoch_{epoch}_pred"] = pred_list
@@ -433,7 +419,7 @@ if __name__ == '__main__':
     parser.add_argument('--log_interval', type=int, default=20, help='how many batches to wait before logging training status')
     parser.add_argument('--name', default='exp', help='model save at {SM_MODEL_DIR}/{name}')
     parser.add_argument('--wandb_name', required=True, type=str, default='name_nth_modelname', help='model name shown in wandb. (Usage: name_nth_modelname, Example: seyoung_1st_resnet18')
-    parser.add_argument('--label', required=True, type=str, default='label', help='set label : age, gender, state, label')
+    parser.add_argument('--label', required=True, type=str, default='label', help='set label : age, gender, mask, label')
     
     # Container environment
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '../Input/data/train/newimages'))
