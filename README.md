@@ -31,14 +31,18 @@ $ python eval_crop.py
 
 ## Train
 ### Train models
-To train models, run follwing commands.
+To train models, run follwing commands. You can choose multi-tasking model or multi-class model to train.
 ```
-$ python train.py SM_CHANNEL_TRAIN=[train image dir] SM_MODEL_DIR=[model saving dir]
+$ python train_by_CLASS.py SM_CHANNEL_TRAIN=[train image dir] SM_MODEL_DIR=[model saving dir]
+$ python train_multitask.py SM_CHANNEL_TRAIN=[train image dir] SM_MODEL_DIR=[model saving dir]
 ```
-You can add arguments for more detailed train.
+You can add arguments (label, optimizer, criterion, resize, epochs, and more) for more detailed train.
 
 ### Pretrained models
 You can download pretrained model that used for my trian from [Link](https://pytorch.org/hub/pytorch_vision_resnet/)
+
+### Grad_cam
+You can watch how your model learning visually by using grad_cam.ipynb
 
 ## Inference
 If trained weights are prepared, you can create submission files that contains label of images.
