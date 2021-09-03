@@ -127,19 +127,30 @@ def print_confusion_matrix(cm):
         print()
         print("   __"*length)
 
-def rand_bbox(size, lam): # size : [Batch_size, Channel, Width, Height]
+def rand_bbox(size, lam, method): # size : [Batch_size, Channel, Width, Height]
     """
     cut_mix function
     """
     W = size[2] 
     H = size[3] 
-    cut_rat = np.sqrt(1. - lam)/1.5  # 패치 크기 비율
-    cut_w = np.int(W * cut_rat)
-    cut_h = np.int(H * cut_rat)  
 
-   	# 패치의 중앙 좌표 값 cx, cy
-    cx = np.random.randint(W*0.7, W)
-    cy = np.random.randint(H*0.3, H*0.7) 
+    if method == 'cutout':
+        cut_rat = np.sqrt(1. - lam)/1.5  # 패치 크기 비율
+        cut_w = np.int(W * cut_rat)
+        cut_h = np.int(H * cut_rat)  
+        
+        # 패치의 중앙 좌표 값 cx, cy
+        cx = np.random.randint(W*0.7, W)
+        cy = np.random.randint(H*0.3, H*0.7) 
+
+    elif method == 'cutmix':  
+        cut_rat = np.sqrt(1. - lam)  # 패치 크기 비율
+        cut_w = np.int(W * cut_rat)
+        cut_h = np.int(H * cut_rat)  
+
+        # 패치의 중앙 좌표 값 cx, cy
+        cx = np.random.randint(W*0.4)
+        cy = np.random.randint(H*0.4, H*0.8) 
 
     # 패치 모서리 좌표 값 
     bbx1 = np.clip(cx - cut_w // 2, 0, W)
@@ -218,9 +229,9 @@ def train(data_dir, model_dir, args):
         AUGMENTATION = args.augmentation
         VAL_SPLIT = args.val_ratio
         DATASET = args.dataset
-        CRITERION = args.criterion
+        DATA_AUGMENT = args.data_argument
         BETA = args.beta
-        PROB = args.cutmix_prob
+        PROB = args.cut_prob
         LABEL = args.label
         NAME = args.wandb_name
         
@@ -228,7 +239,7 @@ def train(data_dir, model_dir, args):
         wandb.login()
         config = {
         'epochs': NUM_EPOCH, 'batch_size': BATCH_SIZE, 'learning_rate': LEARNING_RATE, 'Schedular': SCHEDULAR, 'Criterion': CREITERION,
-        'val_split': VAL_SPLIT,  'Augmentation': AUGMENTATION, 'Dataset': DATASET, 'cutmix.beta': BETA, 'cutmix.prob': PROB, 'Label': LABEL, 'exp': NAME
+        'val_split': VAL_SPLIT,  'Augmentation': AUGMENTATION, 'Dataset': DATASET, 'cut.beta': BETA, 'cut.prob': PROB, 'Label': LABEL, 'exp': NAME
         }
 
         wandb.init(project='image-classification-mask', entity='team-34', config=config)
@@ -260,18 +271,29 @@ def train(data_dir, model_dir, args):
 
                 r = np.random.rand(1)
        
-                if args.beta > 0 and  r < args.cutmix_prob:     
+                if args.data_argument == 'cutout' and  r < args.cutmix_prob:     
                     lam = np.random.beta(args.beta, args.beta)
                     target_a = labels 
-                    bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam)
+                    bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam, args.data_argument)
                     inputs[:, :, bbx1:bbx2, bby1:bby2] = 0
                     lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
                     outs = model(inputs)
-                    loss = criterion(outs, target_a) 
+                    loss = criterion(outs, target_a)
+
+                elif args.data_argument == 'cutmix' and  r < args.cutmix_prob:
+                    lam = np.random.beta(args.beta, args.beta)
+                    rand_index = torch.randperm(inputs.size()[0]).to(device)
+                    target_a = labels 
+                    target_b = labels[rand_index]        
+                    bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam, args.data_argument)
+                    inputs[:, :, bbx1:bbx2, bby1:bby2] = inputs[rand_index, :, bbx1:bbx2, bby1:bby2]
+                    lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
+                    outs = model(inputs)
+                    loss = criterion(outs, target_a) * lam + criterion(outs, target_b) * (1. - lam)
                 
                 else:
                     outs = model(inputs)
-                    loss = criterion(outs, labels)    
+                    loss = criterion(outs, labels)      
                 
                 
                 preds = torch.argmax(outs, dim=-1)
@@ -427,7 +449,8 @@ if __name__ == '__main__':
 
     # cutmix setting  
     parser.add_argument('--beta', default=0, type=float, help='hyperparameter beta')
-    parser.add_argument('--cutmix_prob', default=0, type=float, help='cutmix probability')
+    parser.add_argument('--cut_prob', default=0, type=float, help='cut probability')
+    parser.add_argument('--data_argument', default=0, type=float, help='choose data argument. (example = cutmix, cutout)') 
 
 
     args = parser.parse_args()
