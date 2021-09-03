@@ -19,23 +19,23 @@ The following specs were to create original solution.
 
 ## Dataset
 ### Downloab and extract train.tag.gz to Data/input directory.
-'''
+```
 $ wget -d https://aistages-prod-server-public.s3.amazonaws.com/app/Competitions/000074/data/train.tar.gz
 $ tar -zxvf train.tar.gz
-'''
+```
 
 ### Crop images
-'''
+```
 $ python crop.py
 $ python eval_crop.py
-'''
+```
 
 ## Train
 ### Train models
 To train models, run follwing commands.
-'''
+```
 $ python train.py SM_CHANNEL_TRAIN=[train image dir] SM_MODEL_DIR=[model saving dir]
-'''
+```
 You can add arguments for more detailed train
 
 ### Pretrained models
@@ -43,6 +43,6 @@ You can download pretrained model that used for my trian from [Link](https://pyt
 
 ## Inference
 If trained weights are prepared, you can create submission files that contains label of images.
-'''
+```
 $ python inference.py
-'''
+```
