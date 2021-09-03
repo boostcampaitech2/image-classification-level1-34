@@ -19,7 +19,7 @@ def load_model(saved_model, num_classes, device):
     # tar = tarfile.open(tarpath, 'r:gz')
     # tar.extractall(path=saved_model)
 
-    model_path = os.path.join(saved_model, '4_12_accuracy_91.10%_f1_79.40%.pth')   # need to change
+    model_path = os.path.join(saved_model, args.model_path)   # need to change
     model.load_state_dict(torch.load(model_path, map_location=device))
 
     return model
@@ -59,8 +59,8 @@ def inference(data_dir, model_dir, output_dir, args):
     loader = torch.utils.data.DataLoader(
         dataset,
         batch_size=args.batch_size,
-        #num_workers=8,
         shuffle=False,
+        num_workers=4,
         pin_memory=use_cuda,
         drop_last=False,
     )
@@ -75,7 +75,7 @@ def inference(data_dir, model_dir, output_dir, args):
             preds.extend(pred.cpu().numpy())
 
     info['ans'] = preds
-    info.to_csv(os.path.join(output_dir, f'output.csv'), index=False)
+    info.to_csv(os.path.join(output_dir, f'{args.model_path}_output.csv'), index=False)
     print(f'Inference Done!')
 
 
@@ -83,7 +83,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # Data and model checkpoints directories
-    parser.add_argument('--batch_size', type=int, default=1000, help='input batch size for validing (default: 1000)')
+    parser.add_argument('--batch_size', type=int, default=64, help='input batch size for validing (default: 64)')
     parser.add_argument('--resize', type=tuple, default=(224, 224), help='resize size for image when you trained (default: (224, 224))')
     parser.add_argument('--model', type=str, default='ResNet18', help='model type (default: ResNet18)')                                # need to change
     parser.add_argument('--label', required=True, type=str, default='label', help='set label : age, gender, state, label')
@@ -92,6 +92,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_EVAL', '../Input/data/eval'))
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', './model/Jin_resnet_age_withcutmix72'))                           # need to change
     parser.add_argument('--output_dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', './output'))
+    parser.add_argument('--model_path', type=str, default=os.environ.get('SM_CHANNEL_MODEL', '4_12_accuracy_91.10%_f1_79.40%.pth'))     
 
     args = parser.parse_args()
 
