@@ -271,7 +271,7 @@ def train(data_dir, model_dir, args):
 
                 r = np.random.rand(1)
        
-                if args.data_argument == 'cutout' and  r < args.cutmix_prob:     
+                if args.data_argument == 'cutout' and  r < args.cut_prob:     
                     lam = np.random.beta(args.beta, args.beta)
                     target_a = labels 
                     bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam, args.data_argument)
@@ -280,7 +280,7 @@ def train(data_dir, model_dir, args):
                     outs = model(inputs)
                     loss = criterion(outs, target_a)
 
-                elif args.data_argument == 'cutmix' and  r < args.cutmix_prob:
+                elif args.data_argument == 'cutmix' and  r < args.cut_prob:
                     lam = np.random.beta(args.beta, args.beta)
                     rand_index = torch.randperm(inputs.size()[0]).to(device)
                     target_a = labels 
