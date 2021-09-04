@@ -5,7 +5,6 @@
 import argparse
 import glob
 import json
-import multiprocessing
 import os
 import random
 import re
@@ -16,8 +15,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR, CosineAnnealingWarmRestarts
-from torch.utils.data.sampler import WeightedRandomSampler
-from torch.utils.data import DataLoader
 import seaborn as sns
 from torch.utils.tensorboard import SummaryWriter
 
@@ -26,7 +23,6 @@ from loss import create_criterion
 
 import torch.optim as optim
 import wandb
-import torchvision
 from sklearn.metrics import f1_score, confusion_matrix
 from sklearn.model_selection import StratifiedKFold
 import pandas as pd
