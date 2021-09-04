@@ -396,6 +396,8 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='exp', help='model save at {SM_MODEL_DIR}/{name}')
     parser.add_argument('--wandb_name', required=True, type=str, default='name_nth_modelname', help='model name shown in wandb. (Usage: name_nth_modelname, Example: seyoung_1st_resnet18')
     parser.add_argument('--label', required=True, type=str, default='label', help='set label : age, gender, mask, label')
+    parser.add_argument('--n_split', required=False, type=int, default = 5, help='set split num')
+
     
     # Container environment
     parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '../Input/data/train/newimages'))
