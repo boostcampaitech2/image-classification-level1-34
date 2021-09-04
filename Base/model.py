@@ -1,10 +1,18 @@
+###################
+# import packages #
+###################
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 import math
 from facenet_pytorch import MTCNN, InceptionResnetV1
+from res_mlp_pytorch import ResMLP
 
+#######################
+# Base Model Template #
+#######################
 
 class BaseModel(nn.Module):
     def __init__(self, num_classes):
@@ -35,8 +43,12 @@ class BaseModel(nn.Module):
         x = self.avgpool(x)
         x = x.view(-1, 128)
         return self.fc(x)
+    
+#########################
+# Custom Model Template #
+#########################
 
-# Custom Model Template
+# ResNet18
 class ResNet18(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
@@ -53,8 +65,6 @@ class ResNet18(nn.Module):
         return x
 
 # ResMLP model
-from res_mlp_pytorch import ResMLP
-
 class myResMLP(nn.Module): # 224,224
     def __init__(self, num_classes):
         super().__init__()
@@ -71,8 +81,6 @@ class myResMLP(nn.Module): # 224,224
         return x
 
 # Inception Resnet model
-from facenet_pytorch import InceptionResnetV1
-
 class myInceptionResnet(nn.Module): # 160, 160
     def __init__(self, num_classes):
         super().__init__()
@@ -84,7 +92,9 @@ class myInceptionResnet(nn.Module): # 160, 160
     def forward(self, x):
         x = self.model(x)
         return x
-
+    
+    
+# Inception Resnet model
 class FaceNet(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
