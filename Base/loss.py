@@ -1,9 +1,18 @@
+###################
+# import packages #
+###################
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+###########
+# Classes #
+###########
 
 # https://discuss.pytorch.org/t/is-this-a-correct-implementation-for-focal-loss-in-pytorch/43327/8
+
+# Calculate Focal Loss
 class FocalLoss(nn.Module):
     def __init__(self, weight=None,
                  gamma=2., reduction='mean'):
@@ -22,7 +31,7 @@ class FocalLoss(nn.Module):
             reduction=self.reduction
         )
 
-
+# Calculate Label Smoothing Loss
 class LabelSmoothingLoss(nn.Module):
     def __init__(self, classes=3, smoothing=0.0, dim=-1):
         super(LabelSmoothingLoss, self).__init__()
@@ -41,6 +50,8 @@ class LabelSmoothingLoss(nn.Module):
 
 
 # https://gist.github.com/SuperShinyEyes/dcc68a08ff8b615442e3bc6a9b55a354
+
+# Calculate F1 Loss
 class F1Loss(nn.Module):
     def __init__(self, classes=18, epsilon=1e-7):  # change classes 3 >> 18
         super().__init__()
@@ -65,6 +76,11 @@ class F1Loss(nn.Module):
         return 1 - f1.mean()
 
 
+
+#############
+# functions #
+#############
+
 _criterion_entrypoints = {
     'cross_entropy': nn.CrossEntropyLoss,
     'focal': FocalLoss,
@@ -72,15 +88,15 @@ _criterion_entrypoints = {
     'f1': F1Loss
 }
 
-
+# return cross entropy
 def criterion_entrypoint(criterion_name):
     return _criterion_entrypoints[criterion_name]
 
-
+# check is this criterion by string
 def is_criterion(criterion_name):
     return criterion_name in _criterion_entrypoints
 
-
+# return proper criterion loss for input string
 def create_criterion(criterion_name, **kwargs):
     if is_criterion(criterion_name):
         create_fn = criterion_entrypoint(criterion_name)
