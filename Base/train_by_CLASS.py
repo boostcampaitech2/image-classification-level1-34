@@ -233,7 +233,7 @@ def train(data_dir, model_dir, args):
         best_val_f1 = 0
         best_val_loss = np.inf
 
-        df = pd.DataFrame()
+        result_df = pd.DataFrame()
         for epoch in range(args.epochs):
             # train loop
             model.train()
@@ -328,12 +328,12 @@ def train(data_dir, model_dir, args):
 
                     cm += confusion_matrix(labels.cpu().numpy(), preds.cpu().numpy(),labels=list(range(num_classes)))
 
-                df[f"epoch_{epoch}_path"] = path_list
-                df[f"epoch_{epoch}_pred"] = pred_list
-                df[f"epoch_{epoch}_label"] = labels_list
+                result_df[f"epoch_{epoch}_path"] = path_list
+                result_df[f"epoch_{epoch}_pred"] = pred_list
+                result_df[f"epoch_{epoch}_label"] = labels_list
 
                 val_f1 = f1_score(labels_list, pred_list, average='macro')
-                val_acc = sum((df[f"epoch_{epoch}_pred"] == df[f"epoch_{epoch}_label"]))/len(df)
+                val_acc = sum((result_df[f"epoch_{epoch}_pred"] == result_df[f"epoch_{epoch}_label"]))/len(result_df)
                 val_loss = val_loss / len(val_loader.dataset)
                 best_val_loss = min(best_val_loss, val_loss)
 
@@ -366,7 +366,7 @@ def train(data_dir, model_dir, args):
                     "validation f1": val_f1,
                 })
 
-        df.to_csv(f"{save_dir}/fold_{fold}_{args.label}.csv", index=False)
+        result_df.to_csv(f"{save_dir}/fold_{fold}_{args.label}.csv", index=False)
         wandb.finish()
         
         
