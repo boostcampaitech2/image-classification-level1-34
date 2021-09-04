@@ -51,36 +51,6 @@ def get_lr(optimizer):
     for param_group in optimizer.param_groups:
         return param_group['lr']
 
-def grid_image(np_images, gts, preds, n=16, shuffle=False):
-    batch_size = np_images.shape[0]
-    assert n <= batch_size
-
-    choices = random.choices(range(batch_size), k=n) if shuffle else list(range(n))
-    figure = plt.figure(figsize=(12, 18 + 2))  # cautions: hardcoded, 이미지 크기에 따라 figsize 를 조정해야 할 수 있습니다. T.T
-    plt.subplots_adjust(top=0.8)               # cautions: hardcoded, 이미지 크기에 따라 top 를 조정해야 할 수 있습니다. T.T
-    n_grid = np.ceil(n ** 0.5)
-    tasks = ["mask", "gender", "age"]
-    for idx, choice in enumerate(choices):
-        gt = gts[choice].item()
-        pred = preds[choice].item()
-        image = np_images[choice]
-        # title = f"gt: {gt}, pred: {pred}"
-        gt_decoded_labels = MaskBaseDataset.decode_multi_class(gt)
-        pred_decoded_labels = MaskBaseDataset.decode_multi_class(pred)
-        title = "\n".join([
-            f"{task} - gt: {gt_label}, pred: {pred_label}"
-            for gt_label, pred_label, task
-            in zip(gt_decoded_labels, pred_decoded_labels, tasks)
-        ])
-
-        plt.subplot(n_grid, n_grid, idx + 1, title=title)
-        plt.xticks([])
-        plt.yticks([])
-        plt.grid(False)
-        plt.imshow(image, cmap=plt.cm.binary)
-
-    return figure
-
 def increment_path(path, exist_ok=False):
     """ Automatically increment path, i.e. runs/exp --> runs/exp0, runs/exp1 etc.
     Args:
@@ -96,7 +66,6 @@ def increment_path(path, exist_ok=False):
         i = [int(m.groups()[0]) for m in train_acc if m]
         n = max(i) + 1 if i else 2
         return f"{path}{n}"
-
 
 # sampler를 사용할 때에는 index를 조작해야 하기 때문에 shuffle=False로 설정해야 합니다. 
 def getDataloader(dataset, train_idx, valid_idx, batch_size, num_workers):
@@ -192,7 +161,6 @@ def train(data_dir, model_dir, args):
         label = args.label, data_dir=data_dir
     )
     num_classes = dataset.num_classes  # 18
-
 
     # -- augmentation
     transform_module = getattr(import_module("dataset"), args.augmentation)  # default: CustomAugmentation
@@ -326,11 +294,6 @@ def train(data_dir, model_dir, args):
                         f"Epoch[{epoch}/{args.epochs}]({idx + 1}/{len(train_loader)}) || "
                         f"training loss {middle_train_loss:4.4}  || training f1 {middle_f1:4.2%} || training accuracy {middle_train_acc:4.2%} || lr {current_lr}"
                     )
-
-                    logger.add_scalar("Train/loss", train_loss, epoch * len(train_loader) + idx)
-                    logger.add_scalar("Train/accuracy", train_acc, epoch * len(train_loader) + idx)
-            
-
             
             final_train_loss = train_loss / (len(train_loader.dataset))
             final_train_acc = train_acc / (len(train_loader.dataset))
@@ -341,12 +304,7 @@ def train(data_dir, model_dir, args):
                         "train acc" : final_train_acc,
                         "train f1": final_train_f1,
                     })
-
-            # 각 에폭의 마지막 input 이미지로 grid view 생성
-            img_grid = torchvision.utils.make_grid(inputs)
             
-            # Tensorboard에 train input 이미지 기록
-            logger.add_image(f'{epoch}_train_input_img', img_grid, epoch)
             scheduler.step()
 
             # val loop
@@ -376,13 +334,6 @@ def train(data_dir, model_dir, args):
 
                     cm += confusion_matrix(labels.cpu().numpy(), preds.cpu().numpy(),labels=list(range(num_classes)))
 
-                    if figure is None:
-                        inputs_np = torch.clone(inputs).detach().cpu().permute(0, 2, 3, 1).numpy()
-                        inputs_np = dataset_module.denormalize_image(inputs_np, dataset.mean, dataset.std)
-                        figure = grid_image(
-                            inputs_np, labels, preds, n=16, shuffle=args.dataset != "MaskSplitByProfileDataset"
-                        )
-
                 df[f"epoch_{epoch}_path"] = path_list
                 df[f"epoch_{epoch}_pred"] = pred_list
                 df[f"epoch_{epoch}_label"] = labels_list
@@ -398,7 +349,6 @@ def train(data_dir, model_dir, args):
                     sns.heatmap(cm.astype(int), cmap='Blues', annot=True, fmt="d")
                     plt.savefig(f"{save_dir}/{fold}_{epoch}_Confusion.png")
 
-
                 if val_acc > best_val_acc or val_f1 > best_val_f1:
                     print(f"New best model for val accuracy or f1 : {val_acc:4.2%}|| {val_f1:4.2%}! saving the best model..")
                     torch.save(model.module.state_dict(), f"{save_dir}/{fold}_{epoch}_accuracy_{val_acc:4.2%}_f1_{val_f1:4.2%}.pth")
@@ -412,18 +362,12 @@ def train(data_dir, model_dir, args):
                 print("Print Validaition Confusion Matrix..")
                 print_confusion_matrix(cm)
 
-                logger.add_scalar("Val/loss", val_loss, epoch)
-                logger.add_scalar("Val/accuracy", val_acc, epoch)
-                logger.add_figure("results", figure, epoch)
-                print()
-
                 # wandb 검증 단계에서 Loss, Accuracy 로그 저장
                 wandb.log({
                     "validation loss": val_loss,
                     "validation acc" : val_acc, 
                     "validation f1": val_f1,
                 })
-
 
         df.to_csv(f"{save_dir}/fold_{fold}_{args.label}.csv", index=False)
         wandb.finish()
