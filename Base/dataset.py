@@ -1,3 +1,7 @@
+###################
+# import packages #
+###################
+
 import os
 import random
 from collections import defaultdict
@@ -11,13 +15,28 @@ from torch.utils.data import Dataset, Subset, random_split
 from torchvision import transforms
 from torchvision.transforms import *
 
+
+###################
+# Set Global Vars #
+###################
+
 IMG_EXTENSIONS = [
     ".jpg", ".JPG", ".jpeg", ".JPEG", ".png",
     ".PNG", ".ppm", ".PPM", ".bmp", ".BMP",
 ]
 
+
+#############
+# Functions #
+#############
+
+# 파일이 이미지인지 확인
 def is_image_file(filename):
     return any(filename.endswith(extension) for extension in IMG_EXTENSIONS)
+
+###########
+# Classes #
+###########
 
 # Augmentations
 class BaseAugmentation:
