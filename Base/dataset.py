@@ -25,7 +25,6 @@ IMG_EXTENSIONS = [
     ".PNG", ".ppm", ".PPM", ".bmp", ".BMP",
 ]
 
-
 #############
 # Functions #
 #############
@@ -221,7 +220,7 @@ class MaskBaseDataset(Dataset):
 
         image_transform = self.transform(image)
 
-        return image_transform, ret_label, path, mask_label
+        return image_transform, ret_label, path
 
     def __len__(self):
         return len(self.image_paths)
