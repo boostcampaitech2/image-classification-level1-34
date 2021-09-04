@@ -1,3 +1,7 @@
+###################
+# import packages #
+###################
+
 import torch
 import pandas as pd
 import numpy as np
@@ -8,13 +12,25 @@ from tqdm.notebook import tqdm
 import time
 from glob import glob
 
+#################
+# Set Data Path #
+#################
 
 LOAD_TRAIN_DIR = '../Input/data/train/images'
 SAVE_TRAIN_DIR = '../Input/data/train/newimages'
 
+#################
+# Set Processor #
+#################
+
 device = "cuda"
 mtcnn = MTCNN(device = device, thresholds = [0.60, 0.70, 0.70], min_face_size = 80)
 
+############
+# Function #
+############
+
+# 크롭할 박스 포인트를 얻는 함수 입니다.
 def get_box_point(boxes):
     xmin, xmax = int(boxes[0, 0])-15, int(boxes[0, 2])+15
     ymin, ymax = int(boxes[0, 1])-30, int(boxes[0, 3])+30
@@ -23,6 +39,10 @@ def get_box_point(boxes):
     if xmax > 384: xmax = 384
     if ymax > 512: ymax = 512
     return xmin, xmax, ymin, ymax
+
+########
+# main #
+########
 
 for people_path in tqdm(glob(LOAD_TRAIN_DIR + "/*" )):
     images = []
@@ -47,7 +67,6 @@ for people_path in tqdm(glob(LOAD_TRAIN_DIR + "/*" )):
     
     for i, boxes in enumerate(boxes_list):
         if boxes is not None: 
-#             print("detect_crop")
             xmin, xmax, ymin, ymax = get_box_point(boxes)
             img = images[i][ymin:ymax, xmin:xmax,:]
         else:
@@ -56,14 +75,11 @@ for people_path in tqdm(glob(LOAD_TRAIN_DIR + "/*" )):
                 print("normal_crop",img_path)
                 xmin, xmax, ymin, ymax = get_box_point(boxes_list[normal_idx])
                 img = images[i][ymin:ymax, xmin:xmax,:]
-#                 plt.imshow(img)
-#                 plt.show()
+
             # normal 이미지에서 얼굴 검출 하지 못했다면 미리 세팅한 좌표 사용
             else:
                 print("manual_crop",img_path)
                 img=images[i][100:400, 100:300, :]
-#                 plt.imshow(img)
-#                 plt.show()
         
         #이미지 저장
         people_folder = os.path.join(SAVE_TRAIN_DIR, people_path.split("/")[-1])
