@@ -38,4 +38,4 @@ def Make_label(data_dir,save_file_name,label_list):
         df[label] = frame['ans']
 
     df['ans'] = df['age'] + df['gender'] *3 + df['mask']*6
-    df.to_csv(data_dir+save_file_name'./save_file_name.csv')
+    df.to_csv(data_dir+save_file_name'./save_file_name.csv') 
