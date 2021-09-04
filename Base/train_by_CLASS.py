@@ -17,8 +17,6 @@ import torch
 from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR, CosineAnnealingWarmRestarts
 import seaborn as sns
 from torch.utils.tensorboard import SummaryWriter
-
-from dataset import MaskBaseDataset
 from loss import create_criterion
 
 import torch.optim as optim
@@ -178,7 +176,7 @@ def train(data_dir, model_dir, args):
     elif args.label == "mask":
         labels = dataset.mask_labels
     else:
-    labels = [dataset.encode_multi_class(mask, gender, age) for mask, gender, age in zip(dataset.mask_labels, dataset.gender_labels, dataset.age_labels)]
+        labels = [dataset.encode_multi_class(mask, gender, age) for mask, gender, age in zip(dataset.mask_labels, dataset.gender_labels, dataset.age_labels)]
     for fold, (train_idx, valid_idx) in enumerate(skf.split(dataset.image_paths, labels)):
         # -- data_loader
         # 생성한 Train, Valid Index를 getDataloader 함수에 전달해 train/valid DataLoader를 생성합니다.
@@ -244,7 +242,7 @@ def train(data_dir, model_dir, args):
             train_f1 = 0
 
             for idx, train_batch in enumerate(train_loader):
-                inputs, labels, path, state = train_batch
+                inputs, labels, path = train_batch
                 inputs = inputs.to(device)
                 labels = labels.to(device)
 
