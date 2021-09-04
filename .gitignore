@@ -13,6 +13,3 @@ __pycache__
 /Base/wandb
 
 .gitignore
-
-model
-wandb
