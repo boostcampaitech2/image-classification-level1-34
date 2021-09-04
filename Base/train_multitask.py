@@ -1,3 +1,7 @@
+###################
+# import packages #
+###################
+
 import argparse
 import glob
 import json
@@ -29,6 +33,11 @@ import math
 from torch.optim.lr_scheduler import _LRScheduler
 
 from sklearn import metrics
+
+
+#############
+# functions #
+#############
 
 def seed_everything(seed):
     torch.manual_seed(seed)
@@ -600,7 +609,9 @@ def train(data_dir, model_dir, args):
         print("Accuracy for class {:5s} is: {:.1f} %".format(classname,
                                                     accuracy))
                                                     '''
-
+########
+# main #
+########
 
 if __name__ == '__main__':
     import torch, gc
