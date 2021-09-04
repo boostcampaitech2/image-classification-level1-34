@@ -146,28 +146,32 @@ def print_confusion_matrix(cm):
         print("   __"*length)
 
 
-def rand_bbox(size, lam): # size : [Batch_size, Channel, Width, Height]
+def rand_bbox(size, lam, method): # size : [Batch_size, Channel, Width, Height]
     """
-
     cut_mix function
-
     """
     W = size[2] 
     H = size[3] 
-    cut_rat = np.sqrt(1. - lam)  # 패치 크기 비율
-    cut_w = np.int(W * cut_rat)
-    cut_h = np.int(H * cut_rat)  
-
-   	# 패치의 중앙 좌표 값 cx, cy
-    # cx = np.random.randint(W*0.4)
-    # cy = np.random.randint(H*0.4, H*0.8) 
-    
-
+    if method == 'cutout':
+        cut_rat = np.sqrt(1. - lam)/1.5  # 패치 크기 비율
+        cut_w = np.int(W * cut_rat)
+        cut_h = np.int(H * cut_rat)  
+        
+        # 패치의 중앙 좌표 값 cx, cy
+        cx = np.random.randint(W*0.7, W)
+        cy = np.random.randint(H*0.3, H*0.7) 
+    elif method == 'cutmix':  
+        cut_rat = np.sqrt(1. - lam)  # 패치 크기 비율
+        cut_w = np.int(W * cut_rat)
+        cut_h = np.int(H * cut_rat)  
+        # 패치의 중앙 좌표 값 cx, cy
+        cx = np.random.randint(W*0.4)
+        cy = np.random.randint(H*0.4, H*0.8) 
     # 패치 모서리 좌표 값 
-    bbx1 = np.clip(np.int(W/2) - cut_w, 0, W)
-    bby1 = np.clip(np.int(H//2) - cut_h, 0, H//2)
-    bbx2 = np.clip(np.int(W/2) + cut_w, 0, W)
-    bby2 = np.clip(np.int(H//2) + cut_h, 0, H//2)
+    bbx1 = np.clip(cx - cut_w // 2, 0, W)
+    bby1 = np.clip(cy - cut_h // 2, 0, H)
+    bbx2 = np.clip(cx + cut_w // 2, 0, W)
+    bby2 = np.clip(cy + cut_h // 2, 0, H)
    
     return bbx1, bby1, bbx2, bby2
 
@@ -301,8 +305,11 @@ def train(data_dir, model_dir, args):
         AUGMENTATION = args.augmentation
         VAL_SPLIT = args.val_ratio
         DATASET = args.dataset
+        DATA_AUGMENT = args.data_argument
         BETA = args.beta
-        PROB = args.cutmix_prob
+        PROB = args.cut_prob
+        LABEL = args.label
+        NAME = args.wandb_name
         patient_max = 5
         ACCUM_size = 2
         
@@ -310,7 +317,7 @@ def train(data_dir, model_dir, args):
         wandb.login()
         config = {
         'epochs': NUM_EPOCH, 'batch_size': BATCH_SIZE, 'learning_rate': LEARNING_RATE, 'Schedular': SCHEDULAR, 'Criterion': CREITERION,
-        'val_split': VAL_SPLIT,  'Augmentation': AUGMENTATION, 'Dataset': DATASET, 'cutmix.beta': BETA, 'cutmix.prob': PROB
+        'val_split': VAL_SPLIT,  'Augmentation': AUGMENTATION, 'Dataset': DATASET, 'cutmix.beta': BETA, 'cut.prob': PROB, 'Label': LABEL, 'exp': NAME,
         }
 
         wandb.init(project='image-classification-mask', 
@@ -354,23 +361,26 @@ def train(data_dir, model_dir, args):
                 optimizer.zero_grad()   
 
                 r = np.random.rand(1)
-                if args.beta > 0 and  r < args.cutmix_prob:     
+                if args.data_argument == 'cutout' and  r < args.cut_prob:     
+                    lam = np.random.beta(args.beta, args.beta)
+                    target_a = labels 
+                    bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam, args.data_argument)
+                    inputs[:, :, bbx1:bbx2, bby1:bby2] = 0
+                    lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
+                    outs = model(inputs)
+                    loss = criterion(outs, target_a)
+
+                elif args.data_argument == 'cutmix' and  r < args.cut_prob:
                     lam = np.random.beta(args.beta, args.beta)
                     rand_index = torch.randperm(inputs.size()[0]).to(device)
-                    mask_cut_target, gender_cut_target, age_cut_target = dataset.decode_multi_class(labels[rand_index])        
-                    
-                    bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam)
-                    
+                    target_a = labels 
+                    target_b = labels[rand_index]        
+                    bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam, args.data_argument)
                     inputs[:, :, bbx1:bbx2, bby1:bby2] = inputs[rand_index, :, bbx1:bbx2, bby1:bby2]
-                    
                     lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (inputs.size()[-1] * inputs.size()[-2]))
-                    
-                    pred_age, pred_gender, pred_mask = model(inputs)
-
-                    loss = criterion(pred_age, age_lbl) * lam + criterion(pred_age, age_cut_target) * (1. - lam)
-                    loss += criterion(pred_gender, gender_lbl) * lam + criterion(pred_gender, gender_cut_target) * (1. - lam)   
-                    loss += criterion(pred_mask, mask_lbl) * lam + criterion(pred_mask, mask_cut_target) * (1. - lam) 
-
+                    outs = model(inputs)
+                    loss = criterion(outs, target_a) * lam + criterion(outs, target_b) * (1. - lam)
+                
                 else:
                     pred_age, pred_gender, pred_mask = model(inputs)
                     loss = criterion(pred_age, age_lbl) + criterion(pred_gender, gender_lbl) + criterion(pred_mask, mask_lbl)
@@ -625,14 +635,14 @@ if __name__ == '__main__':
     load_dotenv(verbose=True)
 
     # Data and model checkpoints directories
-    parser.add_argument('--seed', type=int, default=42, help='random seed (default: 42)')
+        parser.add_argument('--seed', type=int, default=42, help='random seed (default: 42)')
     parser.add_argument('--epochs', type=int, default=30, help='number of epochs to train (default: 30)')
-    parser.add_argument('--dataset', type=str, default='MaskMultiTaskingDataset', help='dataset augmentation type (default: MaskSplitByProfileDataset)')
-    parser.add_argument('--augmentation', type=str, default='CustomAugmentation', help='data augmentation type (default: CustomAugmentation)')
+    parser.add_argument('--dataset', type=str, default='MaskSplitByProfileDataset', help='dataset augmentation type (default: MaskSplitByProfileDataset)')
+    parser.add_argument('--augmentation', type=str, default='BaseAugmentation', help='data augmentation type (default: BaseAugmentation)')
     parser.add_argument("--resize", nargs="+", type=list, default=[224, 224], help='resize size for image when training')
-    parser.add_argument('--batch_size', type=int, default=32, help='input batch size for training (default: 64)')
+    parser.add_argument('--batch_size', type=int, default=128, help='input batch size for training (default: 64)')
     parser.add_argument('--valid_batch_size', type=int, default=1000, help='input batch size for validing (default: 1000)')
-    parser.add_argument('--model', type=str, default='efficientnet_multitask', help='model type (default: ResNet18)')
+    parser.add_argument('--model', type=str, default='ResNet18', help='model type (default: ResNet18)')
     parser.add_argument('--optimizer', type=str, default='AdamW', help='optimizer type (default: AdamW)')
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate (default: 1e-3)')
     parser.add_argument('--val_ratio', type=float, default=0.2, help='ratio for validaton (default: 0.2)')
@@ -641,13 +651,16 @@ if __name__ == '__main__':
     parser.add_argument('--log_interval', type=int, default=20, help='how many batches to wait before logging training status')
     parser.add_argument('--name', default='exp', help='model save at {SM_MODEL_DIR}/{name}')
     parser.add_argument('--wandb_name', required=True, type=str, default='name_nth_modelname', help='model name shown in wandb. (Usage: name_nth_modelname, Example: seyoung_1st_resnet18')
+    parser.add_argument('--label', required=True, type=str, default='label', help='set label : age, gender, mask, label')
+
     # Container environment
-    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '/opt/ml/input/data/train/images'))
+    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '/opt/ml/image-classification-level1-34/Input/data/train/newimages'))
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR', './model'))
 
     # cutmix setting
     parser.add_argument('--beta', default=0, type=float, help='hyperparameter beta')
-    parser.add_argument('--cutmix_prob', default=0.2, type=float, help='cutmix probability')
+    parser.add_argument('--cut_prob', default=0, type=float, help='cut probability')
+    parser.add_argument('--data_argument', default=0, type=str, help='choose data argument. (example = cutmix, cutout)') 
 
     args = parser.parse_args()
     print(args)

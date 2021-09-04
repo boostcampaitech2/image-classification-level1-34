@@ -402,7 +402,7 @@ if __name__ == '__main__':
 
     
     # Container environment
-    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '/opt/ml/P01/data/train/new_imgs'))
+    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '/opt/ml/image-classification-level1-34/Input/data/train/newimages'))
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR', './model'))
 
     # cutmix setting  
