@@ -227,7 +227,6 @@ def train(data_dir, model_dir, args):
 
         wandb.watch(model)
         
-        
         # -- Train
         best_val_acc = 0
         best_val_f1 = 0
@@ -298,7 +297,7 @@ def train(data_dir, model_dir, args):
             final_train_loss = train_loss / (len(train_loader.dataset))
             final_train_acc = train_acc / (len(train_loader.dataset))
             final_train_f1 = train_f1/(idx+1)
-
+            
             scheduler.step()
 
             # val loop
@@ -306,14 +305,13 @@ def train(data_dir, model_dir, args):
                 print("Calculating validation results...")
                 model.eval()
                 val_loss = 0
-                figure = None
                 cm = np.zeros((num_classes,num_classes))    
 
                 pred_list = [] 
                 labels_list = []
                 path_list = []
                 for idx, val_batch in  enumerate(val_loader):
-                    inputs, labels, path, state = val_batch
+                    inputs, labels, path = val_batch
                     inputs = inputs.to(device)
                     labels = labels.to(device)
 
@@ -383,7 +381,7 @@ if __name__ == '__main__':
 
     # Data and model checkpoints directories
     parser.add_argument('--seed', type=int, default=42, help='random seed (default: 42)')
-    parser.add_argument('--epochs', type=int, default=30, help='number of epochs to train (default: 30)')
+    parser.add_argument('--epochs', type=int, default=1, help='number of epochs to train (default: 30)')
     parser.add_argument('--dataset', type=str, default='MaskSplitByProfileDataset', help='dataset augmentation type (default: MaskSplitByProfileDataset)')
     parser.add_argument('--augmentation', type=str, default='BaseAugmentation', help='data augmentation type (default: BaseAugmentation)')
     parser.add_argument("--resize", nargs="+", type=list, default=[224, 224], help='resize size for image when training')
@@ -403,7 +401,7 @@ if __name__ == '__main__':
 
     
     # Container environment
-    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '../Input/data/train/newimages'))
+    parser.add_argument('--data_dir', type=str, default=os.environ.get('SM_CHANNEL_TRAIN', '/opt/ml/P01/data/train/new_imgs'))
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR', './model'))
 
     # cutmix setting  
