@@ -1,10 +1,18 @@
+###################
+# import packages #
+###################
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 import math
 from facenet_pytorch import MTCNN, InceptionResnetV1
+from res_mlp_pytorch import ResMLP
 
+#######################
+# Base Model Template #
+#######################
 
 class BaseModel(nn.Module):
     def __init__(self, num_classes):
@@ -35,9 +43,12 @@ class BaseModel(nn.Module):
         x = self.avgpool(x)
         x = x.view(-1, 128)
         return self.fc(x)
+    
+#########################
+# Custom Model Template #
+#########################
 
-
-# Custom Model Template
+# ResNet18
 class ResNet18(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
@@ -53,7 +64,37 @@ class ResNet18(nn.Module):
         x = self.net(x)
         return x
 
+# ResMLP model
+class myResMLP(nn.Module): # 224,224
+    def __init__(self, num_classes):
+        super().__init__()
+        self.model = ResMLP(
+            image_size = (224, 224),
+            patch_size = 16,
+            dim = 384,
+            depth = 12,
+            num_classes = num_classes
+        )
 
+    def forward(self, x):
+        x = self.model(x)
+        return x
+
+# Inception Resnet model
+class myInceptionResnet(nn.Module): # 160, 160
+    def __init__(self, num_classes):
+        super().__init__()
+        self.model = InceptionResnetV1(
+            pretrained='vggface2',
+            num_classes = num_classes
+            )
+
+    def forward(self, x):
+        x = self.model(x)
+        return x
+    
+    
+# Inception Resnet model
 class FaceNet(nn.Module):
     def __init__(self, num_classes):
         super().__init__()

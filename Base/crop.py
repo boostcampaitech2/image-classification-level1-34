@@ -16,9 +16,8 @@ from glob import glob
 # Set Data Path #
 #################
 
-LOAD_TRAIN_DIR = '/opt/ml/input/data/train/images'
-SAVE_TRAIN_DIR = '/opt/ml/input/data/train/newimages'
-
+LOAD_TRAIN_DIR = '../Input/data/train/images'
+SAVE_TRAIN_DIR = '../Input/data/train/newimages'
 
 #################
 # Set Processor #
@@ -27,11 +26,9 @@ SAVE_TRAIN_DIR = '/opt/ml/input/data/train/newimages'
 device = "cuda"
 mtcnn = MTCNN(device = device, thresholds = [0.60, 0.70, 0.70], min_face_size = 80)
 
-
 ############
 # Function #
 ############
-
 
 # 크롭할 박스 포인트를 얻는 함수 입니다.
 def get_box_point(boxes):
@@ -42,7 +39,6 @@ def get_box_point(boxes):
     if xmax > 384: xmax = 384
     if ymax > 512: ymax = 512
     return xmin, xmax, ymin, ymax
-
 
 ########
 # main #
@@ -84,7 +80,6 @@ for people_path in tqdm(glob(LOAD_TRAIN_DIR + "/*" )):
             else:
                 print("manual_crop",img_path)
                 img=images[i][100:400, 100:300, :]
-
         
         #이미지 저장
         people_folder = os.path.join(SAVE_TRAIN_DIR, people_path.split("/")[-1])
