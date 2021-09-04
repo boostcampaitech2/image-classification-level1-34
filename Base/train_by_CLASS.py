@@ -172,7 +172,7 @@ def train(data_dir, model_dir, args):
     dataset.set_transform(transform)
 
     # 5-fold Stratified KFold 5개의 fold를 형성하고 5번 Cross Validation을 진행합니다.
-    n_splits = 5
+    n_splits = args.n_split
     skf = StratifiedKFold(n_splits=n_splits)
 
     labels = [dataset.encode_multi_class(mask, gender, age) for mask, gender, age in zip(dataset.mask_labels, dataset.gender_labels, dataset.age_labels)]
