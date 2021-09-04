@@ -358,6 +358,9 @@ def train(data_dir, model_dir, args):
 
                 # wandb 검증 단계에서 Loss, Accuracy 로그 저장
                 wandb.log({
+                    "train loss": final_train_loss,
+                    "train acc" : final_train_acc,
+                    "train f1": final_train_f1,
                     "validation loss": val_loss,
                     "validation acc" : val_acc, 
                     "validation f1": val_f1,
