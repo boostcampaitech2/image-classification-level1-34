@@ -171,6 +171,13 @@ def train(data_dir, model_dir, args):
     n_splits = args.n_split
     skf = StratifiedKFold(n_splits=n_splits)
 
+    if args.label == "age":
+        labels = dataset.age_labels
+    elif args.label == "gender":
+        labels = dataset.gender_labels
+    elif args.label == "mask":
+        labels = dataset.mask_labels
+    else:
     labels = [dataset.encode_multi_class(mask, gender, age) for mask, gender, age in zip(dataset.mask_labels, dataset.gender_labels, dataset.age_labels)]
     for fold, (train_idx, valid_idx) in enumerate(skf.split(dataset.image_paths, labels)):
         # -- data_loader
