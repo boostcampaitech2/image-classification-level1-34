@@ -1,3 +1,7 @@
+###################
+# import packages #
+###################
+
 import argparse
 import glob
 import json
@@ -27,6 +31,12 @@ from sklearn.metrics import f1_score, confusion_matrix
 from sklearn.model_selection import StratifiedKFold
 import pandas as pd
 
+
+#############
+# Functions #
+#############
+
+#Hold random seed
 def seed_everything(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
@@ -36,6 +46,7 @@ def seed_everything(seed):
     np.random.seed(seed)
     random.seed(seed)
 
+# get learning rate
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
         return param_group['lr']
@@ -333,6 +344,7 @@ def train(data_dir, model_dir, args):
 
             # 각 에폭의 마지막 input 이미지로 grid view 생성
             img_grid = torchvision.utils.make_grid(inputs)
+            
             # Tensorboard에 train input 이미지 기록
             logger.add_image(f'{epoch}_train_input_img', img_grid, epoch)
             scheduler.step()
@@ -384,7 +396,6 @@ def train(data_dir, model_dir, args):
                     plt.figure(figsize=(15,13))
                     plt.title("Validation CM %s"%args.wandb_name)
                     sns.heatmap(cm.astype(int), cmap='Blues', annot=True, fmt="d")
-
                     plt.savefig(f"{save_dir}/{fold}_{epoch}_Confusion.png")
 
 
@@ -416,7 +427,12 @@ def train(data_dir, model_dir, args):
 
         df.to_csv(f"{save_dir}/fold_{fold}_{args.label}.csv", index=False)
         wandb.finish()
-
+        
+        
+########
+# main #
+########
+        
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
